@@ -1,51 +1,54 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
-namespace PokeREST.DTOs
+namespace PokeREST.DTOs;
+
+public class AddExistingPokemonDto
 {
-    public class CreatePokemonDto
-    {
-        [Required]
-        [StringLength(100, MinimumLength = 1)]
-        [RegularExpression(@"^[a-zA-Z0-9\s\-\.]+$", ErrorMessage = "Pokemon name contains invalid characters")]
-        [JsonPropertyName("name")]
-        public string Name { get; set; } = string.Empty;
+    [Required]
+    [Range(1, int.MaxValue, ErrorMessage = "PokemonId must be a positive number")]
+    [JsonPropertyName("pokemonId")]
+    public int PokemonId { get; set; }
+}
 
-        [Range(1, 100, ErrorMessage = "Level must be between 1 and 100")]
-        [JsonPropertyName("level")]
-        public int Level { get; set; }
+public class PokemonResponseDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
 
-        [Required]
-        [Range(1, int.MaxValue, ErrorMessage = "Valid type ID is required")]
-        [JsonPropertyName("typeId")]
-        public int TypeId { get; set; }
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
 
-        [Range(1, 9999, ErrorMessage = "Health must be between 1 and 9999")]
-        [JsonPropertyName("health")]
-        public int Health { get; set; }
-    }
+    [JsonPropertyName("level")]
+    public int Level { get; set; }
 
-    public class PokemonDto
-    {
-        [JsonPropertyName("id")]
-        public int Id { get; set; }
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
 
-        [JsonPropertyName("name")]
-        public string Name { get; set; } = string.Empty;
+    [JsonPropertyName("owner")]
+    public string? Owner { get; set; }
 
-        [JsonPropertyName("level")]
-        public int Level { get; set; }
+    [JsonPropertyName("health")]
+    public int Health { get; set; }
 
-        [JsonPropertyName("type")]
-        public string Type { get; set; } = string.Empty;
+    [JsonPropertyName("caughtAt")]
+    public DateTime? CaughtAt { get; set; }
 
-        [JsonPropertyName("owner")]
-        public string? Owner { get; set; }
+    [JsonPropertyName("moves")]
+    public List<MoveResponseDto> Moves { get; set; } = new();
+}
 
-        [JsonPropertyName("health")]
-        public int Health { get; set; }
+public class MoveResponseDto
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
 
-        [JsonPropertyName("caughtAt")]
-        public DateTime? CaughtAt { get; set; }
-    }
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("power")]
+    public int Power { get; set; }
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
 }
