@@ -130,21 +130,6 @@ public class TrainersController : ControllerBase
     }
 
     /// <summary>
-    /// Updates trainer information (PUT method)
-    /// </summary>
-    /// <param name="id">Trainer ID</param>
-    /// <param name="updateTrainerDto">Updated trainer data</param>
-    /// <returns>Updated trainer information</returns>
-    [HttpPut("{id}")]
-    [ProducesResponseType(typeof(ApiResponse<TrainerResponseDto>), 200)]
-    [ProducesResponseType(typeof(ApiResponse<object>), 400)]
-    [ProducesResponseType(typeof(ApiResponse<object>), 404)]
-    public async Task<ActionResult<ApiResponse<TrainerResponseDto>>> PutTrainer(int id, [FromBody] UpdateTrainerDto updateTrainerDto)
-    {
-        return await UpdateTrainer(id, updateTrainerDto);
-    }
-
-    /// <summary>
     /// Deletes a trainer
     /// </summary>
     /// <param name="id">Trainer ID</param>
