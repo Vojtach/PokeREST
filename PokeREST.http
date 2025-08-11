@@ -1,6 +1,277 @@
-@PokeREST_HostAddress = http://localhost:5273
+@api_host = http://localhost:5273
+@trainer_id = 1
+@pokemon_id = 1
 
-GET {{PokeREST_HostAddress}}/weatherforecast/
+###
+
+# -----------------------------------------------------------------------------------------
+# Trainers API
+# -----------------------------------------------------------------------------------------
+
+# Health Check
+GET {{api_host}}/api/trainers
 Accept: application/json
+
+###
+
+# Create a new trainer
+POST {{api_host}}/api/trainers
+Content-Type: application/json
+
+{
+  "name": "Ash Ketchum",
+  "region": "Kanto",
+  "age": 10
+}
+
+###
+
+# Get all trainers
+GET {{api_host}}/api/trainers
+Accept: application/json
+
+###
+
+# Get a specific trainer by ID
+GET {{api_host}}/api/trainers/{{trainer_id}}
+Accept: application/json
+
+###
+
+# Update a trainer's information (PATCH)
+PATCH {{api_host}}/api/trainers/{{trainer_id}}
+Content-Type: application/json
+
+{
+  "name": "Red",
+  "age": 16,
+  "wins": 150,
+  "losses": 5
+}
+
+###
+
+# Delete a trainer by ID
+DELETE {{api_host}}/api/trainers/{{trainer_id}}
+Accept: application/json
+
+###
+
+# Get paginated trainers with filtering and sorting
+GET {{api_host}}/api/trainers/paginated?name=Ash&region=Kanto&minAge=10&maxAge=15&pageNumber=1&pageSize=5&sortBy=name&sortOrder=asc
+Accept: application/json
+
+###
+
+# -----------------------------------------------------------------------------------------
+# Pokemon API
+# -----------------------------------------------------------------------------------------
+
+# Add an existing Pokemon to a trainer
+POST {{api_host}}/api/trainers/{{trainer_id}}/pokemon
+Content-Type: application/json
+
+{
+  "pokemonId": {{pokemon_id}}
+}
+
+###
+
+# Get all Pokemon with optional filtering
+GET {{api_host}}/api/pokemon?name=Pikachu&type=Electric&minLevel=5&hasOwner=true
+Accept: application/json
+
+###
+
+# Get paginated Pokemon with advanced filtering and sorting
+GET {{api_host}}/api/pokemon/paginated?type=Fire&minLevel=10&maxLevel=50&pageNumber=1&pageSize=10&sortBy=level&sortOrder=desc
+Accept: application/json
+
+###
+
+# -----------------------------------------------------------------------------------------
+# Additional Testing Scenarios
+# -----------------------------------------------------------------------------------------
+
+# Create trainer with minimal data
+POST {{api_host}}/api/trainers
+Content-Type: application/json
+
+{
+  "name": "Gary Oak"
+}
+
+###
+
+# Create trainer with all fields
+POST {{api_host}}/api/trainers
+Content-Type: application/json
+
+{
+  "name": "Misty",
+  "region": "Cerulean City",
+  "age": 12
+}
+
+###
+
+# Search Pokemon by name (fuzzy search)
+GET {{api_host}}/api/pokemon?name=Pikachu
+Accept: application/json
+
+###
+
+# Search Pokemon by type
+GET {{api_host}}/api/pokemon?type=Water
+Accept: application/json
+
+###
+
+# Search Pokemon by owner name
+GET {{api_host}}/api/pokemon?owner=Ash
+Accept: application/json
+
+###
+
+# Search Pokemon with level range
+GET {{api_host}}/api/pokemon?minLevel=10&maxLevel=50
+Accept: application/json
+
+###
+
+# Search for unowned Pokemon
+GET {{api_host}}/api/pokemon?hasOwner=false
+Accept: application/json
+
+###
+
+# Search for owned Pokemon
+GET {{api_host}}/api/pokemon?hasOwner=true
+Accept: application/json
+
+###
+
+# Complex search with multiple filters
+GET {{api_host}}/api/pokemon?name=Char&type=Fire&minLevel=15&maxLevel=35&hasOwner=true
+Accept: application/json
+
+###
+
+# Search trainers by name
+GET {{api_host}}/api/trainers/paginated?name=Ash&pageSize=20
+Accept: application/json
+
+###
+
+# Search trainers by region
+GET {{api_host}}/api/trainers/paginated?region=Kanto
+Accept: application/json
+
+###
+
+# Search trainers with age range
+GET {{api_host}}/api/trainers/paginated?minAge=12&maxAge=18
+Accept: application/json
+
+###
+
+# Search trainers with wins range
+GET {{api_host}}/api/trainers/paginated?minWins=50&maxWins=200
+Accept: application/json
+
+###
+
+# Sort trainers by age descending
+GET {{api_host}}/api/trainers/paginated?sortBy=age&sortOrder=desc
+Accept: application/json
+
+###
+
+# Sort trainers by wins descending
+GET {{api_host}}/api/trainers/paginated?sortBy=wins&sortOrder=desc
+Accept: application/json
+
+###
+
+# Sort Pokemon by name ascending
+GET {{api_host}}/api/pokemon/paginated?sortBy=name&sortOrder=asc
+Accept: application/json
+
+###
+
+# Sort Pokemon by caughtAt descending (most recent first)
+GET {{api_host}}/api/pokemon/paginated?sortBy=caughtAt&sortOrder=desc
+Accept: application/json
+
+###
+
+# -----------------------------------------------------------------------------------------
+# Error Testing Scenarios
+# -----------------------------------------------------------------------------------------
+
+# Test invalid trainer creation (empty name)
+POST {{api_host}}/api/trainers
+Content-Type: application/json
+
+{
+  "name": "",
+  "region": "Kanto",
+  "age": 10
+}
+
+###
+
+# Test invalid trainer creation (age out of range)
+POST {{api_host}}/api/trainers
+Content-Type: application/json
+
+{
+  "name": "Invalid Trainer",
+  "age": 150
+}
+
+###
+
+# Test invalid level range in Pokemon search
+GET {{api_host}}/api/pokemon?minLevel=50&maxLevel=10
+Accept: application/json
+
+###
+
+# Test invalid sort field in Pokemon paginated search
+GET {{api_host}}/api/pokemon/paginated?sortBy=invalid_field&sortOrder=asc
+Accept: application/json
+
+###
+
+# Test invalid page size (too large)
+GET {{api_host}}/api/pokemon/paginated?pageSize=500
+Accept: application/json
+
+###
+
+# Test nonexistent trainer ID
+GET {{api_host}}/api/trainers/99999
+Accept: application/json
+
+###
+
+# Test adding Pokemon to nonexistent trainer
+POST {{api_host}}/api/trainers/99999/pokemon
+Content-Type: application/json
+
+{
+  "pokemonId": 1
+}
+
+###
+
+# Test invalid Pokemon ID (negative)
+POST {{api_host}}/api/trainers/{{trainer_id}}/pokemon
+Content-Type: application/json
+
+{
+  "pokemonId": -1
+}
 
 ###
