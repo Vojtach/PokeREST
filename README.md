@@ -31,6 +31,18 @@ Welcome to PokeREST, a comprehensive RESTful API for managing Pokémon trainers 
 *   [Docker Desktop](https://www.docker.com/products/docker-desktop)
 *   A PostgreSQL instance (either local or on a server)
 
+
+## Database:
+
+## 1. PostgreSQL Setup
+Ensure you have a PostgreSQL database set up and running. You can use a local instance and manage with pgadmin.
+
+### 2. Run seeding scripts on your PostgreSQL instance (Scripts are provided separate, as this is a case study and to not leak any company provided resources)
+• create_pokemon_db.sql - Creates the PostgreSQL database
+• pokemon_database_complete.sql - Creates tables and populates with sample Pokémon data
+
+## API:
+
 ### 1. Clone the Repository
 
 ```bash
