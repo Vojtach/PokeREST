@@ -52,3 +52,31 @@ public class MoveResponseDto
     [JsonPropertyName("type")]
     public string Type { get; set; } = string.Empty;
 }
+
+public class PokemonSearchDto
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("minLevel")]
+    [Range(1, 100, ErrorMessage = "MinLevel must be between 1 and 100")]
+    public int? MinLevel { get; set; }
+
+    [JsonPropertyName("maxLevel")]
+    [Range(1, 100, ErrorMessage = "MaxLevel must be between 1 and 100")]
+    public int? MaxLevel { get; set; }
+
+    [JsonPropertyName("owner")]
+    public string? Owner { get; set; }
+
+    [JsonPropertyName("hasOwner")]
+    public bool? HasOwner { get; set; }
+
+    public bool IsValid()
+    {
+        return MinLevel == null || MaxLevel == null || MinLevel <= MaxLevel;
+    }
+}

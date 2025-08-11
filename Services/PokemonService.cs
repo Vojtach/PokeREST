@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using PokeREST.DTOs;
 using PokeREST.Models;
+using PokeREST.Helpers;
 
 namespace PokeREST.Services;
 
@@ -54,6 +55,116 @@ public class PokemonService : IPokemonService
             .ToListAsync();
 
         return pokemon.Select(MapToPokemonResponseDto).ToList();
+    }
+
+    public async Task<List<PokemonResponseDto>> SearchPokemonAsync(PokemonSearchDto searchCriteria)
+    {
+        var query = _context.Pokemons
+            .AsNoTracking()
+            .Include(p => p.Type)
+            .Include(p => p.Owner)
+            .Include(p => p.PokemonMoves)
+            .ThenInclude(pm => pm.Move)
+            .ThenInclude(m => m.Type)
+            .AsQueryable();
+
+        // Apply exact filters first for performance
+        if (searchCriteria.MinLevel.HasValue)
+        {
+            query = query.Where(p => p.Level >= searchCriteria.MinLevel.Value);
+        }
+
+        if (searchCriteria.MaxLevel.HasValue)
+        {
+            query = query.Where(p => p.Level <= searchCriteria.MaxLevel.Value);
+        }
+
+        if (searchCriteria.HasOwner.HasValue)
+        {
+            if (searchCriteria.HasOwner.Value)
+            {
+                query = query.Where(p => p.OwnerId != null);
+            }
+            else
+            {
+                query = query.Where(p => p.OwnerId == null);
+            }
+        }
+
+        // Get all potential matches
+        var allPokemon = await query.ToListAsync();
+        var results = new List<(PokemonResponseDto Pokemon, double Score)>();
+
+        foreach (var pokemon in allPokemon)
+        {
+            var score = 0.0;
+            var matchFound = false;
+
+            // Name matching (primary criteria)
+            if (!string.IsNullOrWhiteSpace(searchCriteria.Name))
+            {
+                if (FuzzyMatchingHelper.IsFuzzyMatch(searchCriteria.Name, pokemon.Name))
+                {
+                    score += FuzzyMatchingHelper.GetMatchScore(searchCriteria.Name, pokemon.Name);
+                    matchFound = true;
+                }
+                else if (string.IsNullOrWhiteSpace(searchCriteria.Type) && 
+                         string.IsNullOrWhiteSpace(searchCriteria.Owner))
+                {
+                    // If only name is specified and it doesn't match, skip this pokemon
+                    continue;
+                }
+            }
+            else
+            {
+                matchFound = true; // No name filter means all pass
+            }
+
+            // Type matching
+            if (!string.IsNullOrWhiteSpace(searchCriteria.Type))
+            {
+                if (FuzzyMatchingHelper.IsFuzzyMatch(searchCriteria.Type, pokemon.Type.Name))
+                {
+                    score += FuzzyMatchingHelper.GetMatchScore(searchCriteria.Type, pokemon.Type.Name) * 0.8;
+                    matchFound = true;
+                }
+                else if (string.IsNullOrWhiteSpace(searchCriteria.Name) && 
+                         string.IsNullOrWhiteSpace(searchCriteria.Owner))
+                {
+                    // If only type is specified and it doesn't match, skip this pokemon
+                    continue;
+                }
+            }
+
+            // Owner matching
+            if (!string.IsNullOrWhiteSpace(searchCriteria.Owner))
+            {
+                if (pokemon.Owner != null && 
+                    FuzzyMatchingHelper.IsFuzzyMatch(searchCriteria.Owner, pokemon.Owner.Name))
+                {
+                    score += FuzzyMatchingHelper.GetMatchScore(searchCriteria.Owner, pokemon.Owner.Name) * 0.6;
+                    matchFound = true;
+                }
+                else if (string.IsNullOrWhiteSpace(searchCriteria.Name) && 
+                         string.IsNullOrWhiteSpace(searchCriteria.Type))
+                {
+                    // If only owner is specified and it doesn't match, skip this pokemon
+                    continue;
+                }
+            }
+
+            if (matchFound)
+            {
+                results.Add((MapToPokemonResponseDto(pokemon), score));
+            }
+        }
+
+        // Sort by score (descending) and then by name for consistency
+        return results
+            .OrderByDescending(r => r.Score)
+            .ThenBy(r => r.Pokemon.Name)
+            .Select(r => r.Pokemon)
+            .ToList();
     }
 
     private static PokemonResponseDto MapToPokemonResponseDto(Pokemon pokemon)

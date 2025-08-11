@@ -59,17 +59,68 @@ public class PokemonController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all Pokemon
+    /// Gets all Pokemon or searches Pokemon with optional filters
     /// </summary>
-    /// <returns>List of all Pokemon</returns>
+    /// <param name="name">Pokemon name (supports partial matching and typos)</param>
+    /// <param name="type">Pokemon type (supports partial matching)</param>
+    /// <param name="minLevel">Minimum level filter</param>
+    /// <param name="maxLevel">Maximum level filter</param>
+    /// <param name="owner">Owner name (supports partial matching)</param>
+    /// <param name="hasOwner">Filter by ownership status</param>
+    /// <returns>List of Pokemon matching the search criteria</returns>
     [HttpGet("pokemon")]
     [ProducesResponseType(typeof(ApiResponse<List<PokemonResponseDto>>), 200)]
-    public async Task<ActionResult<ApiResponse<List<PokemonResponseDto>>>> GetAllPokemon()
+    [ProducesResponseType(typeof(ApiResponse<object>), 400)]
+    public async Task<ActionResult<ApiResponse<List<PokemonResponseDto>>>> GetAllPokemon(
+        [FromQuery] string? name = null,
+        [FromQuery] string? type = null,
+        [FromQuery] int? minLevel = null,
+        [FromQuery] int? maxLevel = null,
+        [FromQuery] string? owner = null,
+        [FromQuery] bool? hasOwner = null)
     {
         try
         {
-            var pokemon = await _pokemonService.GetAllPokemonAsync();
-            return Ok(ApiResponse<List<PokemonResponseDto>>.SuccessResponse(pokemon, "Pokemon found successfully"));
+            // Check if any search criteria are provided
+            var hasSearchCriteria = !string.IsNullOrWhiteSpace(name) ||
+                                   !string.IsNullOrWhiteSpace(type) ||
+                                   minLevel.HasValue ||
+                                   maxLevel.HasValue ||
+                                   !string.IsNullOrWhiteSpace(owner) ||
+                                   hasOwner.HasValue;
+
+            if (hasSearchCriteria)
+            {
+                // Create search criteria object
+                var searchCriteria = new PokemonSearchDto
+                {
+                    Name = name,
+                    Type = type,
+                    MinLevel = minLevel,
+                    MaxLevel = maxLevel,
+                    Owner = owner,
+                    HasOwner = hasOwner
+                };
+
+                // Validate search criteria
+                if (!searchCriteria.IsValid())
+                {
+                    return BadRequest(ApiResponse<object>.ErrorResponse("Invalid search criteria: MinLevel must be less than or equal to MaxLevel", 400));
+                }
+
+                var searchResults = await _pokemonService.SearchPokemonAsync(searchCriteria);
+                var message = searchResults.Any() 
+                    ? $"Found {searchResults.Count} Pokemon matching search criteria"
+                    : "No Pokemon found matching search criteria";
+                
+                return Ok(ApiResponse<List<PokemonResponseDto>>.SuccessResponse(searchResults, message));
+            }
+            else
+            {
+                // No search criteria, return all Pokemon
+                var pokemon = await _pokemonService.GetAllPokemonAsync();
+                return Ok(ApiResponse<List<PokemonResponseDto>>.SuccessResponse(pokemon, "Pokemon retrieved successfully"));
+            }
         }
         catch (Exception)
         {
