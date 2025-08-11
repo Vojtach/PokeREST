@@ -72,6 +72,26 @@ public class PokemonServiceTests : IClassFixture<DatabaseFixture>
     }
 
     [Fact]
+    public async Task AddExistingPokemonToTrainerAsync_WithPokemonAlreadyOwned_ShouldReturnNull()
+    {
+        // Arrange - Try to assign Pikachu (ID 1) which is already owned by Ash (trainer 1) to trainer 2
+        var trainerId = 2;
+        var pokemonId = 1; // Pikachu already owned by trainer 1
+
+        // Act
+        var result = await _service.AddExistingPokemonToTrainerAsync(trainerId, pokemonId);
+
+        // Assert
+        result.Should().BeNull();
+        
+        // Verify that Pikachu is still owned by trainer 1
+        var pikachu = await _fixture.Context.Pokemons
+            .FirstOrDefaultAsync(p => p.Id == pokemonId);
+        pikachu.Should().NotBeNull();
+        pikachu!.OwnerId.Should().Be(1); // Should still belong to original owner
+    }
+
+    [Fact]
     public async Task GetAllPokemonAsync_ShouldReturnAllPokemon()
     {
         // Act
