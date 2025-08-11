@@ -100,24 +100,37 @@ public class PokemonService : IPokemonService
             var score = 0.0;
             var matchFound = false;
 
-            // Name matching (primary criteria)
-            if (!string.IsNullOrWhiteSpace(searchCriteria.Name))
+            // Check if this is a filter-only search (HasOwner without text criteria)
+            var hasTextCriteria = !string.IsNullOrWhiteSpace(searchCriteria.Name) ||
+                                 !string.IsNullOrWhiteSpace(searchCriteria.Type) ||
+                                 !string.IsNullOrWhiteSpace(searchCriteria.Owner);
+            
+            if (!hasTextCriteria)
             {
-                if (FuzzyMatchingHelper.IsFuzzyMatch(searchCriteria.Name, pokemon.Name))
-                {
-                    score += FuzzyMatchingHelper.GetMatchScore(searchCriteria.Name, pokemon.Name);
-                    matchFound = true;
-                }
-                else if (string.IsNullOrWhiteSpace(searchCriteria.Type) && 
-                         string.IsNullOrWhiteSpace(searchCriteria.Owner))
-                {
-                    // If only name is specified and it doesn't match, skip this pokemon
-                    continue;
-                }
+                // This is a filter-only search (level range and/or HasOwner), include all filtered results
+                matchFound = true;
             }
             else
             {
-                matchFound = true; // No name filter means all pass
+                // Name matching (primary criteria)
+                if (!string.IsNullOrWhiteSpace(searchCriteria.Name))
+                {
+                    if (FuzzyMatchingHelper.IsFuzzyMatch(searchCriteria.Name, pokemon.Name))
+                    {
+                        score += FuzzyMatchingHelper.GetMatchScore(searchCriteria.Name, pokemon.Name);
+                        matchFound = true;
+                    }
+                    else if (string.IsNullOrWhiteSpace(searchCriteria.Type) && 
+                             string.IsNullOrWhiteSpace(searchCriteria.Owner))
+                    {
+                        // If only name is specified and it doesn't match, skip this pokemon
+                        continue;
+                    }
+                }
+                else
+                {
+                    matchFound = true; // No name filter means all pass
+                }
             }
 
             // Type matching
