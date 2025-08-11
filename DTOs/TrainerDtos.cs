@@ -75,3 +75,62 @@ public class TrainerWithPokemonDto : TrainerResponseDto
     public List<PokemonResponseDto> Pokemons { get; set; } = new();
 }
 
+public class PaginatedTrainerSearchDto
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("region")]
+    public string? Region { get; set; }
+
+    [JsonPropertyName("minAge")]
+    [Range(1, 99, ErrorMessage = "MinAge must be between 1 and 99")]
+    public int? MinAge { get; set; }
+
+    [JsonPropertyName("maxAge")]
+    [Range(1, 99, ErrorMessage = "MaxAge must be between 1 and 99")]
+    public int? MaxAge { get; set; }
+
+    [JsonPropertyName("minWins")]
+    [Range(0, int.MaxValue, ErrorMessage = "MinWins must be non-negative")]
+    public int? MinWins { get; set; }
+
+    [JsonPropertyName("maxWins")]
+    [Range(0, int.MaxValue, ErrorMessage = "MaxWins must be non-negative")]
+    public int? MaxWins { get; set; }
+
+    [JsonPropertyName("minPokemonCount")]
+    [Range(0, int.MaxValue, ErrorMessage = "MinPokemonCount must be non-negative")]
+    public int? MinPokemonCount { get; set; }
+
+    [JsonPropertyName("maxPokemonCount")]
+    [Range(0, int.MaxValue, ErrorMessage = "MaxPokemonCount must be non-negative")]
+    public int? MaxPokemonCount { get; set; }
+
+    [JsonPropertyName("pageNumber")]
+    [Range(1, int.MaxValue, ErrorMessage = "Page number must be greater than 0")]
+    public int PageNumber { get; set; } = 1;
+
+    [JsonPropertyName("pageSize")]
+    [Range(1, 100, ErrorMessage = "Page size must be between 1 and 100")]
+    public int PageSize { get; set; } = 10;
+
+    [JsonPropertyName("sortBy")]
+    public string? SortBy { get; set; } = "name";
+
+    [JsonPropertyName("sortOrder")]
+    public string? SortOrder { get; set; } = "asc";
+
+    public bool IsValid()
+    {
+        var validSortFields = new[] { "name", "region", "age", "wins", "losses", "pokemoncount", "createdat" };
+        var validSortOrders = new[] { "asc", "desc" };
+        
+        return (MinAge == null || MaxAge == null || MinAge <= MaxAge) &&
+               (MinWins == null || MaxWins == null || MinWins <= MaxWins) &&
+               (MinPokemonCount == null || MaxPokemonCount == null || MinPokemonCount <= MaxPokemonCount) &&
+               (string.IsNullOrEmpty(SortBy) || validSortFields.Contains(SortBy.ToLower())) &&
+               (string.IsNullOrEmpty(SortOrder) || validSortOrders.Contains(SortOrder.ToLower()));
+    }
+}
+

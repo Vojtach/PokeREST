@@ -117,6 +117,96 @@ public class TrainerService : ITrainerService
             .AnyAsync(t => t.Id == id);
     }
 
+    public async Task<PaginatedResponse<TrainerResponseDto>> GetPaginatedTrainersAsync(PaginatedTrainerSearchDto searchCriteria)
+    {
+        var query = _context.Trainers
+            .AsNoTracking()
+            .Include(t => t.Pokemons)
+            .AsQueryable();
+
+        // Apply filters
+        if (!string.IsNullOrWhiteSpace(searchCriteria.Name))
+        {
+            var searchName = searchCriteria.Name.ToLower();
+            query = query.Where(t => t.Name.ToLower().Contains(searchName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchCriteria.Region))
+        {
+            var searchRegion = searchCriteria.Region.ToLower();
+            query = query.Where(t => t.Region != null && t.Region.ToLower().Contains(searchRegion));
+        }
+
+        if (searchCriteria.MinAge.HasValue)
+        {
+            query = query.Where(t => t.Age >= searchCriteria.MinAge.Value);
+        }
+
+        if (searchCriteria.MaxAge.HasValue)
+        {
+            query = query.Where(t => t.Age <= searchCriteria.MaxAge.Value);
+        }
+
+        if (searchCriteria.MinWins.HasValue)
+        {
+            query = query.Where(t => t.Wins >= searchCriteria.MinWins.Value);
+        }
+
+        if (searchCriteria.MaxWins.HasValue)
+        {
+            query = query.Where(t => t.Wins <= searchCriteria.MaxWins.Value);
+        }
+
+        if (searchCriteria.MinPokemonCount.HasValue)
+        {
+            query = query.Where(t => t.Pokemons.Count >= searchCriteria.MinPokemonCount.Value);
+        }
+
+        if (searchCriteria.MaxPokemonCount.HasValue)
+        {
+            query = query.Where(t => t.Pokemons.Count <= searchCriteria.MaxPokemonCount.Value);
+        }
+
+        // Get total count before pagination
+        var totalItems = await query.CountAsync();
+
+        // Apply sorting
+        var sortBy = searchCriteria.SortBy?.ToLower() ?? "name";
+        var sortOrder = searchCriteria.SortOrder?.ToLower() ?? "asc";
+
+        query = sortBy switch
+        {
+            "name" => sortOrder == "desc" ? query.OrderByDescending(t => t.Name) : query.OrderBy(t => t.Name),
+            "region" => sortOrder == "desc" ? query.OrderByDescending(t => t.Region ?? string.Empty) : query.OrderBy(t => t.Region ?? string.Empty),
+            "age" => sortOrder == "desc" ? query.OrderByDescending(t => t.Age ?? 0) : query.OrderBy(t => t.Age ?? 0),
+            "wins" => sortOrder == "desc" ? query.OrderByDescending(t => t.Wins ?? 0) : query.OrderBy(t => t.Wins ?? 0),
+            "losses" => sortOrder == "desc" ? query.OrderByDescending(t => t.Losses ?? 0) : query.OrderBy(t => t.Losses ?? 0),
+            "pokemoncount" => sortOrder == "desc" ? query.OrderByDescending(t => t.Pokemons.Count) : query.OrderBy(t => t.Pokemons.Count),
+            "createdat" => sortOrder == "desc" ? query.OrderByDescending(t => t.CreatedAt ?? DateTime.MinValue) : query.OrderBy(t => t.CreatedAt ?? DateTime.MinValue),
+            _ => query.OrderBy(t => t.Name)
+        };
+
+        // Apply pagination
+        var skipCount = (searchCriteria.PageNumber - 1) * searchCriteria.PageSize;
+        var paginatedQuery = query.Skip(skipCount).Take(searchCriteria.PageSize);
+
+        var trainers = await paginatedQuery.ToListAsync();
+        var trainerDtos = trainers.Select(MapToTrainerResponseDto).ToList();
+
+        var totalPages = (int)Math.Ceiling((double)totalItems / searchCriteria.PageSize);
+
+        return new PaginatedResponse<TrainerResponseDto>
+        {
+            Data = trainerDtos,
+            TotalItems = totalItems,
+            PageNumber = searchCriteria.PageNumber,
+            PageSize = searchCriteria.PageSize,
+            TotalPages = totalPages,
+            HasPreviousPage = searchCriteria.PageNumber > 1,
+            HasNextPage = searchCriteria.PageNumber < totalPages
+        };
+    }
+
     private static TrainerResponseDto MapToTrainerResponseDto(Trainer trainer)
     {
         return new TrainerResponseDto

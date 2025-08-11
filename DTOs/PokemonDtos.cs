@@ -80,3 +80,50 @@ public class PokemonSearchDto
         return MinLevel == null || MaxLevel == null || MinLevel <= MaxLevel;
     }
 }
+
+public class PaginatedPokemonSearchDto
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("minLevel")]
+    [Range(1, 100, ErrorMessage = "MinLevel must be between 1 and 100")]
+    public int? MinLevel { get; set; }
+
+    [JsonPropertyName("maxLevel")]
+    [Range(1, 100, ErrorMessage = "MaxLevel must be between 1 and 100")]
+    public int? MaxLevel { get; set; }
+
+    [JsonPropertyName("owner")]
+    public string? Owner { get; set; }
+
+    [JsonPropertyName("hasOwner")]
+    public bool? HasOwner { get; set; }
+
+    [JsonPropertyName("pageNumber")]
+    [Range(1, int.MaxValue, ErrorMessage = "Page number must be greater than 0")]
+    public int PageNumber { get; set; } = 1;
+
+    [JsonPropertyName("pageSize")]
+    [Range(1, 100, ErrorMessage = "Page size must be between 1 and 100")]
+    public int PageSize { get; set; } = 10;
+
+    [JsonPropertyName("sortBy")]
+    public string? SortBy { get; set; } = "name";
+
+    [JsonPropertyName("sortOrder")]
+    public string? SortOrder { get; set; } = "asc";
+
+    public bool IsValid()
+    {
+        var validSortFields = new[] { "name", "level", "caughtAt", "type" };
+        var validSortOrders = new[] { "asc", "desc" };
+        
+        return (MinLevel == null || MaxLevel == null || MinLevel <= MaxLevel) &&
+               (string.IsNullOrEmpty(SortBy) || validSortFields.Contains(SortBy.ToLower())) &&
+               (string.IsNullOrEmpty(SortOrder) || validSortOrders.Contains(SortOrder.ToLower()));
+    }
+}

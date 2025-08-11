@@ -10,4 +10,5 @@ public interface ITrainerService
     Task<TrainerResponseDto?> UpdateTrainerAsync(int id, UpdateTrainerDto updateTrainerDto);
     Task<bool> DeleteTrainerAsync(int id);
     Task<bool> TrainerExistsAsync(int id);
+    Task<PaginatedResponse<TrainerResponseDto>> GetPaginatedTrainersAsync(PaginatedTrainerSearchDto searchCriteria);
 }

@@ -154,4 +154,78 @@ public class TrainersController : ControllerBase
             return StatusCode(500, ApiResponse<object>.ErrorResponse("Internal server error", 500));
         }
     }
+
+    /// <summary>
+    /// Gets paginated trainers with advanced filtering and sorting
+    /// </summary>
+    /// <param name="name">Trainer name (supports partial matching)</param>
+    /// <param name="region">Trainer region (supports partial matching)</param>
+    /// <param name="minAge">Minimum age filter</param>
+    /// <param name="maxAge">Maximum age filter</param>
+    /// <param name="minWins">Minimum wins filter</param>
+    /// <param name="maxWins">Maximum wins filter</param>
+    /// <param name="minPokemonCount">Minimum Pokemon count filter</param>
+    /// <param name="maxPokemonCount">Maximum Pokemon count filter</param>
+    /// <param name="pageNumber">Page number (default: 1)</param>
+    /// <param name="pageSize">Items per page (default: 10, max: 100)</param>
+    /// <param name="sortBy">Sort field: name, region, age, wins, losses, pokemonCount, createdAt (default: name)</param>
+    /// <param name="sortOrder">Sort order: asc, desc (default: asc)</param>
+    /// <returns>Paginated list of trainers matching the search criteria</returns>
+    [HttpGet("paginated")]
+    [ProducesResponseType(typeof(ApiResponse<PaginatedResponse<TrainerResponseDto>>), 200)]
+    [ProducesResponseType(typeof(ApiResponse<object>), 400)]
+    public async Task<ActionResult<ApiResponse<PaginatedResponse<TrainerResponseDto>>>> GetPaginatedTrainers(
+        [FromQuery] string? name = null,
+        [FromQuery] string? region = null,
+        [FromQuery] int? minAge = null,
+        [FromQuery] int? maxAge = null,
+        [FromQuery] int? minWins = null,
+        [FromQuery] int? maxWins = null,
+        [FromQuery] int? minPokemonCount = null,
+        [FromQuery] int? maxPokemonCount = null,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string sortBy = "name",
+        [FromQuery] string sortOrder = "asc")
+    {
+        try
+        {
+            // Create search criteria object
+            var searchCriteria = new PaginatedTrainerSearchDto
+            {
+                Name = name,
+                Region = region,
+                MinAge = minAge,
+                MaxAge = maxAge,
+                MinWins = minWins,
+                MaxWins = maxWins,
+                MinPokemonCount = minPokemonCount,
+                MaxPokemonCount = maxPokemonCount,
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                SortBy = sortBy,
+                SortOrder = sortOrder
+            };
+
+            // Validate search criteria
+            if (!searchCriteria.IsValid())
+            {
+                return BadRequest(ApiResponse<object>.ErrorResponse(
+                    "Invalid search criteria. Check ranges and sort fields (name, region, age, wins, losses, pokemonCount, createdAt).",
+                    400));
+            }
+
+            var result = await _trainerService.GetPaginatedTrainersAsync(searchCriteria);
+            
+            var message = result.TotalItems > 0 
+                ? $"Found {result.TotalItems} trainers (Page {result.PageNumber} of {result.TotalPages})"
+                : "No trainers found matching search criteria";
+            
+            return Ok(ApiResponse<PaginatedResponse<TrainerResponseDto>>.SuccessResponse(result, message));
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, ApiResponse<object>.ErrorResponse("Internal server error", 500));
+        }
+    }
 }

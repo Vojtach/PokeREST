@@ -167,6 +167,95 @@ public class PokemonService : IPokemonService
             .ToList();
     }
 
+    public async Task<PaginatedResponse<PokemonResponseDto>> GetPaginatedPokemonAsync(PaginatedPokemonSearchDto searchCriteria)
+    {
+        var query = _context.Pokemons
+            .AsNoTracking()
+            .Include(p => p.Type)
+            .Include(p => p.Owner)
+            .Include(p => p.PokemonMoves)
+            .ThenInclude(pm => pm.Move)
+            .ThenInclude(m => m.Type)
+            .AsQueryable();
+
+        // Apply filters
+        if (!string.IsNullOrWhiteSpace(searchCriteria.Name))
+        {
+            var searchName = searchCriteria.Name.ToLower();
+            query = query.Where(p => p.Name.ToLower().Contains(searchName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchCriteria.Type))
+        {
+            var searchType = searchCriteria.Type.ToLower();
+            query = query.Where(p => p.Type.Name.ToLower().Contains(searchType));
+        }
+
+        if (searchCriteria.MinLevel.HasValue)
+        {
+            query = query.Where(p => p.Level >= searchCriteria.MinLevel.Value);
+        }
+
+        if (searchCriteria.MaxLevel.HasValue)
+        {
+            query = query.Where(p => p.Level <= searchCriteria.MaxLevel.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(searchCriteria.Owner))
+        {
+            var searchOwner = searchCriteria.Owner.ToLower();
+            query = query.Where(p => p.Owner != null && p.Owner.Name.ToLower().Contains(searchOwner));
+        }
+
+        if (searchCriteria.HasOwner.HasValue)
+        {
+            if (searchCriteria.HasOwner.Value)
+            {
+                query = query.Where(p => p.OwnerId != null);
+            }
+            else
+            {
+                query = query.Where(p => p.OwnerId == null);
+            }
+        }
+
+        // Get total count before pagination
+        var totalItems = await query.CountAsync();
+
+        // Apply sorting
+        var sortBy = searchCriteria.SortBy?.ToLower() ?? "name";
+        var sortOrder = searchCriteria.SortOrder?.ToLower() ?? "asc";
+
+        query = sortBy switch
+        {
+            "name" => sortOrder == "desc" ? query.OrderByDescending(p => p.Name) : query.OrderBy(p => p.Name),
+            "level" => sortOrder == "desc" ? query.OrderByDescending(p => p.Level) : query.OrderBy(p => p.Level),
+            "caughtat" => sortOrder == "desc" ? query.OrderByDescending(p => p.CaughtAt ?? DateTime.MinValue) : query.OrderBy(p => p.CaughtAt ?? DateTime.MinValue),
+            "type" => sortOrder == "desc" ? query.OrderByDescending(p => p.Type.Name) : query.OrderBy(p => p.Type.Name),
+            _ => query.OrderBy(p => p.Name)
+        };
+
+        // Apply pagination
+        var skipCount = (searchCriteria.PageNumber - 1) * searchCriteria.PageSize;
+        var paginatedQuery = query.Skip(skipCount).Take(searchCriteria.PageSize);
+
+        var pokemon = await paginatedQuery.ToListAsync();
+        var pokemonDtos = pokemon.Select(MapToPokemonResponseDto).ToList();
+
+        var totalPages = (int)Math.Ceiling((double)totalItems / searchCriteria.PageSize);
+
+        return new PaginatedResponse<PokemonResponseDto>
+        {
+            Data = pokemonDtos,
+            TotalItems = totalItems,
+            PageNumber = searchCriteria.PageNumber,
+            PageSize = searchCriteria.PageSize,
+            TotalPages = totalPages,
+            HasPreviousPage = searchCriteria.PageNumber > 1,
+            HasNextPage = searchCriteria.PageNumber < totalPages
+        };
+    }
+
     private static PokemonResponseDto MapToPokemonResponseDto(Pokemon pokemon)
     {
         return new PokemonResponseDto
