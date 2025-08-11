@@ -242,17 +242,6 @@ Robust error handling with meaningful error messages:
 |----------|-------------|---------|
 | `DB_CONNECTION_STRING` | PostgreSQL connection string | Yes |
 
-### Database Migration
-
-To create and apply database migrations:
-
-```bash
-# Create a new migration
-dotnet ef migrations add InitialCreate
-
-# Apply migrations to database
-dotnet ef database update
-```
 
 ## Deployment
 
