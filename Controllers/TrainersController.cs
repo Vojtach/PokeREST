@@ -4,6 +4,10 @@ using PokeREST.Services;
 
 namespace PokeREST.Controllers;
 
+/// <summary>
+/// Controller for managing trainer operations including CRUD operations, searching, and pagination.
+/// Provides comprehensive endpoints for trainer management with advanced filtering and sorting capabilities.
+/// </summary>
 [ApiController]
 [Route("api/trainers")]
 [Produces("application/json")]

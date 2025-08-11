@@ -3,6 +3,9 @@ using System.Text.Json.Serialization;
 
 namespace PokeREST.DTOs;
 
+/// <summary>
+/// Data transfer object for adding an existing Pokemon to a trainer.
+/// </summary>
 public class AddExistingPokemonDto
 {
     [Required]
@@ -11,6 +14,9 @@ public class AddExistingPokemonDto
     public int PokemonId { get; set; }
 }
 
+/// <summary>
+/// Data transfer object representing Pokemon information in API responses.
+/// </summary>
 public class PokemonResponseDto
 {
     [JsonPropertyName("id")]
@@ -38,6 +44,9 @@ public class PokemonResponseDto
     public List<MoveResponseDto> Moves { get; set; } = new();
 }
 
+/// <summary>
+/// Data transfer object representing Pokemon move information in API responses.
+/// </summary>
 public class MoveResponseDto
 {
     [JsonPropertyName("id")]
@@ -53,6 +62,9 @@ public class MoveResponseDto
     public string Type { get; set; } = string.Empty;
 }
 
+/// <summary>
+/// Data transfer object for Pokemon search criteria with fuzzy matching support.
+/// </summary>
 public class PokemonSearchDto
 {
     [JsonPropertyName("name")]
@@ -81,6 +93,9 @@ public class PokemonSearchDto
     }
 }
 
+/// <summary>
+/// Data transfer object for paginated Pokemon search with filtering, sorting, and pagination parameters.
+/// </summary>
 public class PaginatedPokemonSearchDto
 {
     [JsonPropertyName("name")]

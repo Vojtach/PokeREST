@@ -4,6 +4,11 @@ using PokeREST.Models;
 
 namespace PokeREST.Services;
 
+/// <summary>
+/// Implementation of trainer management service providing comprehensive trainer operations.
+/// Handles CRUD operations, advanced searching with filtering, pagination, and Pokemon ownership management.
+/// Includes efficient query building and comprehensive trainer data mapping.
+/// </summary>
 public class TrainerService : ITrainerService
 {
     private readonly PokemonContext _context;

@@ -3,6 +3,9 @@ using System.Text.Json.Serialization;
 
 namespace PokeREST.DTOs;
 
+/// <summary>
+/// Data transfer object for creating a new trainer.
+/// </summary>
 public class CreateTrainerDto
 {
     [Required]
@@ -19,6 +22,9 @@ public class CreateTrainerDto
     public int? Age { get; set; }
 }
 
+/// <summary>
+/// Data transfer object for updating an existing trainer. All fields are optional.
+/// </summary>
 public class UpdateTrainerDto
 {
     [StringLength(100, MinimumLength = 1, ErrorMessage = "Name must be between 1 and 100 characters")]
@@ -42,6 +48,9 @@ public class UpdateTrainerDto
     public int? Losses { get; set; }
 }
 
+/// <summary>
+/// Data transfer object representing trainer information in API responses.
+/// </summary>
 public class TrainerResponseDto
 {
     [JsonPropertyName("id")]
@@ -69,12 +78,18 @@ public class TrainerResponseDto
     public int PokemonCount { get; set; }
 }
 
+/// <summary>
+/// Data transfer object representing trainer information with detailed Pokemon collection in API responses.
+/// </summary>
 public class TrainerWithPokemonDto : TrainerResponseDto
 {
     [JsonPropertyName("pokemons")]
     public List<PokemonResponseDto> Pokemons { get; set; } = new();
 }
 
+/// <summary>
+/// Data transfer object for paginated trainer search with comprehensive filtering, sorting, and pagination parameters.
+/// </summary>
 public class PaginatedTrainerSearchDto
 {
     [JsonPropertyName("name")]

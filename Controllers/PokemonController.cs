@@ -4,6 +4,10 @@ using PokeREST.Services;
 
 namespace PokeREST.Controllers;
 
+/// <summary>
+/// Controller for managing Pokemon operations including trainer assignments, searching, and pagination.
+/// Provides endpoints for adding Pokemon to trainers, searching with fuzzy matching, and paginated retrieval.
+/// </summary>
 [ApiController]
 [Route("api")]
 [Produces("application/json")]

@@ -2,6 +2,10 @@ using System.Text.Json.Serialization;
 
 namespace PokeREST.DTOs;
 
+/// <summary>
+/// Generic API response wrapper providing consistent response format with success status, message, and data.
+/// </summary>
+/// <typeparam name="T">The type of data being returned in the response.</typeparam>
 public class ApiResponse<T>
 {
     [JsonPropertyName("success")]
@@ -39,6 +43,10 @@ public class ApiResponse<T>
     }
 }
 
+/// <summary>
+/// Response wrapper for paginated data containing items and pagination metadata.
+/// </summary>
+/// <typeparam name="T">The type of items in the paginated collection.</typeparam>
 public class PaginatedResponse<T>
 {
     [JsonPropertyName("data")]

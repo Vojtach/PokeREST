@@ -6,6 +6,11 @@ using PokeREST.Models;
 
 namespace PokeREST.Services;
 
+/// <summary>
+/// Implementation of Pokemon management service providing comprehensive Pokemon operations.
+/// Handles Pokemon search with fuzzy matching, pagination, trainer assignments, and data retrieval.
+/// Includes advanced filtering capabilities and efficient query optimization for large datasets.
+/// </summary>
 public class PokemonService : IPokemonService
 {
     private readonly PokemonContext _context;
