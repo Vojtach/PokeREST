@@ -47,7 +47,12 @@ public class TrainersController : ControllerBase
     /// </param>
     /// <returns>An <see cref="ApiResponse{T}"/> wrapping the created <see cref="TrainerResponseDto"/>.</returns>
     /// <response code="201">Trainer was created.</response>
-    /// <response code="400">Request body failed validation. Because of <c>[ApiController]</c>, this is returned as a standard ProblemDetails payload, not the <see cref="ApiResponse{T}"/> envelope.</response>
+    /// <response code="400">
+    /// The service returned no trainer (<see cref="ApiResponse{T}"/> envelope; defensive, not expected with the current service).
+    /// Request body failed validation. Because of <c>[ApiController]</c>, this is returned as a standard ProblemDetails payload, not the <see cref="ApiResponse{T}"/> envelope.
+    /// The action's own <c>ModelState</c> check returns the <see cref="ApiResponse{T}"/> envelope instead, but only when the
+    /// automatic validation is bypassed (e.g. the action is invoked directly).
+    /// </response>
     /// <response code="500">Unexpected server error.</response>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<TrainerResponseDto>), 201)]
@@ -179,7 +184,11 @@ public class TrainersController : ControllerBase
     /// </param>
     /// <returns>An <see cref="ApiResponse{T}"/> wrapping the updated <see cref="TrainerResponseDto"/>.</returns>
     /// <response code="200">Trainer was updated.</response>
-    /// <response code="400">Request body failed validation. Because of <c>[ApiController]</c>, this is returned as a standard ProblemDetails payload, not the <see cref="ApiResponse{T}"/> envelope.</response>
+    /// <response code="400">
+    /// Request body failed validation. Because of <c>[ApiController]</c>, this is returned as a standard ProblemDetails payload, not the <see cref="ApiResponse{T}"/> envelope.
+    /// The action's own <c>ModelState</c> check returns the <see cref="ApiResponse{T}"/> envelope instead, but only when the
+    /// automatic validation is bypassed (e.g. the action is invoked directly).
+    /// </response>
     /// <response code="404">Trainer with the given ID does not exist.</response>
     /// <response code="500">Unexpected server error. Also returned for a non-positive ID, because the service rejects it with an exception instead of a 400.</response>
     [HttpPatch("{id}")]

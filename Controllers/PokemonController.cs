@@ -52,6 +52,8 @@ public class PokemonController : ControllerBase
     /// <response code="400">
     /// The Pokemon does not exist or is already owned (<see cref="ApiResponse{T}"/> envelope).
     /// Request body failed validation. Because of <c>[ApiController]</c>, this is returned as a standard ProblemDetails payload, not the <see cref="ApiResponse{T}"/> envelope.
+    /// The action's own <c>ModelState</c> check returns the <see cref="ApiResponse{T}"/> envelope instead, but only when the
+    /// automatic validation is bypassed (e.g. the action is invoked directly).
     /// </response>
     /// <response code="404">Trainer with the given ID does not exist.</response>
     /// <response code="500">Unexpected server error. Also returned for a non-positive ID, because the service rejects it with an exception instead of a 400.</response>
