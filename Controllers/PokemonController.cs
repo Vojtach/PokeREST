@@ -16,6 +16,11 @@ public class PokemonController : ControllerBase
     private readonly IPokemonService _pokemonService;
     private readonly ITrainerService _trainerService;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PokemonController"/> class.
+    /// </summary>
+    /// <param name="pokemonService">Service handling Pokemon retrieval, search, and trainer assignment.</param>
+    /// <param name="trainerService">Service used to verify that a target trainer exists.</param>
     public PokemonController(IPokemonService pokemonService, ITrainerService trainerService)
     {
         _pokemonService = pokemonService;
@@ -23,11 +28,30 @@ public class PokemonController : ControllerBase
     }
 
     /// <summary>
-    /// Adds an existing Pokemon to a trainer
+    /// Assigns an existing, currently unowned Pokemon to a trainer ("catches" it).
     /// </summary>
-    /// <param name="trainerId">Trainer ID</param>
-    /// <param name="addExistingPokemonDto">Pokemon assignment data</param>
-    /// <returns>Updated Pokemon information</returns>
+    /// <remarks>
+    /// <c>POST /api/trainers/{trainerId}/pokemon</c>
+    ///
+    /// Sets the Pokemon's owner to the given trainer and stamps its <c>caughtAt</c> time with the current UTC time.
+    /// The assignment fails if the Pokemon does not exist or already belongs to a trainer.
+    ///
+    /// Sample request:
+    ///
+    ///     POST /api/trainers/1/pokemon
+    ///     {
+    ///         "pokemonId": 25
+    ///     }
+    /// </remarks>
+    /// <param name="trainerId">ID of the trainer who receives the Pokemon (route parameter).</param>
+    /// <param name="addExistingPokemonDto">Request body containing the <c>pokemonId</c> (positive integer) of the Pokemon to assign.</param>
+    /// <returns>
+    /// An <see cref="ApiResponse{T}"/> wrapping the updated <see cref="PokemonResponseDto"/>, including its new owner and moves.
+    /// </returns>
+    /// <response code="200">Pokemon was assigned to the trainer.</response>
+    /// <response code="400">Request body is invalid, or the Pokemon does not exist or is already owned.</response>
+    /// <response code="404">Trainer with the given ID does not exist.</response>
+    /// <response code="500">Unexpected server error.</response>
     [HttpPost("trainers/{trainerId}/pokemon")]
     [ProducesResponseType(typeof(ApiResponse<PokemonResponseDto>), 200)]
     [ProducesResponseType(typeof(ApiResponse<object>), 400)]
@@ -63,15 +87,35 @@ public class PokemonController : ControllerBase
     }
 
     /// <summary>
-    /// Gets all Pokemon or searches Pokemon with optional filters
+    /// Gets all Pokemon, or searches Pokemon using fuzzy matching when any filter is supplied.
     /// </summary>
-    /// <param name="name">Pokemon name (supports partial matching and typos)</param>
-    /// <param name="type">Pokemon type (supports partial matching)</param>
-    /// <param name="minLevel">Minimum level filter</param>
-    /// <param name="maxLevel">Maximum level filter</param>
-    /// <param name="owner">Owner name (supports partial matching)</param>
-    /// <param name="hasOwner">Filter by ownership status</param>
-    /// <returns>List of Pokemon matching the search criteria</returns>
+    /// <remarks>
+    /// <c>GET /api/pokemon</c>
+    ///
+    /// With no query parameters, every Pokemon is returned. When at least one parameter is supplied, a search is performed:
+    /// level and ownership filters are applied exactly, while <paramref name="name"/>, <paramref name="type"/>, and
+    /// <paramref name="owner"/> are fuzzy-matched (partial matches and minor typos are tolerated). Search results are
+    /// ordered by match relevance, then by name.
+    ///
+    /// Sample requests:
+    ///
+    ///     GET /api/pokemon
+    ///     GET /api/pokemon?name=pikchu
+    ///     GET /api/pokemon?type=fire&amp;minLevel=10&amp;maxLevel=50
+    ///     GET /api/pokemon?hasOwner=false
+    /// </remarks>
+    /// <param name="name">Optional Pokemon name to fuzzy-match (partial matches and typos are tolerated).</param>
+    /// <param name="type">Optional Pokemon type name to fuzzy-match (e.g. <c>fire</c>, <c>water</c>).</param>
+    /// <param name="minLevel">Optional inclusive minimum level (1–100). Must not exceed <paramref name="maxLevel"/>.</param>
+    /// <param name="maxLevel">Optional inclusive maximum level (1–100).</param>
+    /// <param name="owner">Optional owner (trainer) name to fuzzy-match. Only Pokemon that have an owner can match.</param>
+    /// <param name="hasOwner">Optional ownership filter: <c>true</c> for owned Pokemon only, <c>false</c> for wild (unowned) Pokemon only.</param>
+    /// <returns>
+    /// An <see cref="ApiResponse{T}"/> wrapping a list of <see cref="PokemonResponseDto"/>. The list is empty when nothing matches.
+    /// </returns>
+    /// <response code="200">Pokemon were retrieved (the list may be empty).</response>
+    /// <response code="400">Search criteria are invalid, e.g. <c>minLevel</c> is greater than <c>maxLevel</c>.</response>
+    /// <response code="500">Unexpected server error.</response>
     [HttpGet("pokemon")]
     [ProducesResponseType(typeof(ApiResponse<List<PokemonResponseDto>>), 200)]
     [ProducesResponseType(typeof(ApiResponse<object>), 400)]
@@ -133,19 +177,36 @@ public class PokemonController : ControllerBase
     }
 
     /// <summary>
-    /// Gets paginated Pokemon with advanced filtering and sorting
+    /// Gets a single page of Pokemon with optional filtering and sorting.
     /// </summary>
-    /// <param name="name">Pokemon name (supports partial matching)</param>
-    /// <param name="type">Pokemon type (supports partial matching)</param>
-    /// <param name="minLevel">Minimum level filter</param>
-    /// <param name="maxLevel">Maximum level filter</param>
-    /// <param name="owner">Owner name (supports partial matching)</param>
-    /// <param name="hasOwner">Filter by ownership status</param>
-    /// <param name="pageNumber">Page number (default: 1)</param>
-    /// <param name="pageSize">Items per page (default: 10, max: 100)</param>
-    /// <param name="sortBy">Sort field: name, level, caughtAt, type (default: name)</param>
-    /// <param name="sortOrder">Sort order: asc, desc (default: asc)</param>
-    /// <returns>Paginated list of Pokemon matching the search criteria</returns>
+    /// <remarks>
+    /// <c>GET /api/pokemon/paginated</c>
+    ///
+    /// Unlike <c>GET /api/pokemon</c>, text filters here use case-insensitive substring matching (no typo tolerance),
+    /// and the query runs on the database. Filters are applied first, then sorting, then pagination.
+    /// Sort field and sort order values are case-insensitive.
+    ///
+    /// Sample request:
+    ///
+    ///     GET /api/pokemon/paginated?type=water&amp;pageNumber=2&amp;pageSize=20&amp;sortBy=level&amp;sortOrder=desc
+    /// </remarks>
+    /// <param name="name">Optional substring that the Pokemon name must contain.</param>
+    /// <param name="type">Optional substring that the Pokemon type name must contain.</param>
+    /// <param name="minLevel">Optional inclusive minimum level (1–100). Must not exceed <paramref name="maxLevel"/>.</param>
+    /// <param name="maxLevel">Optional inclusive maximum level (1–100).</param>
+    /// <param name="owner">Optional substring that the owner (trainer) name must contain.</param>
+    /// <param name="hasOwner">Optional ownership filter: <c>true</c> for owned Pokemon only, <c>false</c> for wild (unowned) Pokemon only.</param>
+    /// <param name="pageNumber">1-based page number to return (default: 1).</param>
+    /// <param name="pageSize">Number of items per page, 1–100 (default: 10).</param>
+    /// <param name="sortBy">Sort field: <c>name</c>, <c>level</c>, <c>caughtAt</c>, or <c>type</c> (default: <c>name</c>).</param>
+    /// <param name="sortOrder">Sort direction: <c>asc</c> or <c>desc</c> (default: <c>asc</c>).</param>
+    /// <returns>
+    /// An <see cref="ApiResponse{T}"/> wrapping a <see cref="PaginatedResponse{T}"/> of <see cref="PokemonResponseDto"/>,
+    /// which holds the page items and pagination metadata (total items, total pages, previous/next page flags).
+    /// </returns>
+    /// <response code="200">The requested page was retrieved (it may contain no items).</response>
+    /// <response code="400">Search criteria are invalid: bad level range, unknown sort field, or unknown sort order.</response>
+    /// <response code="500">Unexpected server error.</response>
     [HttpGet("pokemon/paginated")]
     [ProducesResponseType(typeof(ApiResponse<PaginatedResponse<PokemonResponseDto>>), 200)]
     [ProducesResponseType(typeof(ApiResponse<object>), 400)]
