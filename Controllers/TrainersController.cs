@@ -47,7 +47,7 @@ public class TrainersController : ControllerBase
     /// </param>
     /// <returns>An <see cref="ApiResponse{T}"/> wrapping the created <see cref="TrainerResponseDto"/>.</returns>
     /// <response code="201">Trainer was created.</response>
-    /// <response code="400">Request body is invalid or the trainer could not be created.</response>
+    /// <response code="400">Request body failed validation. Because of <c>[ApiController]</c>, this is returned as a standard ProblemDetails payload, not the <see cref="ApiResponse{T}"/> envelope.</response>
     /// <response code="500">Unexpected server error.</response>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponse<TrainerResponseDto>), 201)]
@@ -131,7 +131,7 @@ public class TrainersController : ControllerBase
     /// </returns>
     /// <response code="200">Trainer was found.</response>
     /// <response code="404">Trainer with the given ID does not exist.</response>
-    /// <response code="500">Unexpected server error.</response>
+    /// <response code="500">Unexpected server error. Also returned for a non-positive ID, because the service rejects it with an exception instead of a 400.</response>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResponse<TrainerWithPokemonDto>), 200)]
     [ProducesResponseType(typeof(ApiResponse<object>), 404)]
@@ -162,6 +162,7 @@ public class TrainersController : ControllerBase
     /// <c>PATCH /api/trainers/{id}</c>
     ///
     /// Only fields present in the request body are changed; omitted or <c>null</c> fields keep their current values.
+    /// An empty <c>name</c> is ignored, whereas an empty <c>region</c> clears the region.
     ///
     /// Sample request:
     ///
@@ -178,9 +179,9 @@ public class TrainersController : ControllerBase
     /// </param>
     /// <returns>An <see cref="ApiResponse{T}"/> wrapping the updated <see cref="TrainerResponseDto"/>.</returns>
     /// <response code="200">Trainer was updated.</response>
-    /// <response code="400">Request body is invalid.</response>
+    /// <response code="400">Request body failed validation. Because of <c>[ApiController]</c>, this is returned as a standard ProblemDetails payload, not the <see cref="ApiResponse{T}"/> envelope.</response>
     /// <response code="404">Trainer with the given ID does not exist.</response>
-    /// <response code="500">Unexpected server error.</response>
+    /// <response code="500">Unexpected server error. Also returned for a non-positive ID, because the service rejects it with an exception instead of a 400.</response>
     [HttpPatch("{id}")]
     [ProducesResponseType(typeof(ApiResponse<TrainerResponseDto>), 200)]
     [ProducesResponseType(typeof(ApiResponse<object>), 400)]
@@ -234,7 +235,7 @@ public class TrainersController : ControllerBase
     /// <returns>An <see cref="ApiResponse{T}"/> with a confirmation message and <c>null</c> data.</returns>
     /// <response code="200">Trainer was deleted.</response>
     /// <response code="404">Trainer with the given ID does not exist.</response>
-    /// <response code="500">Unexpected server error.</response>
+    /// <response code="500">Unexpected server error. Also returned for a non-positive ID, because the service rejects it with an exception instead of a 400.</response>
     [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResponse<object>), 200)]
     [ProducesResponseType(typeof(ApiResponse<object>), 404)]
@@ -265,7 +266,8 @@ public class TrainersController : ControllerBase
     /// <c>GET /api/trainers/paginated</c>
     ///
     /// Text filters use case-insensitive substring matching. All range filters are inclusive, and each minimum
-    /// must not exceed its maximum. Filters are applied first, then sorting, then pagination.
+    /// must not exceed its maximum. The documented limits for ages (1–99) and counts (non-negative) are not enforced.
+    /// Filters are applied first, then sorting, then pagination.
     /// Sort field and sort order values are case-insensitive.
     ///
     /// Sample request:
@@ -274,14 +276,14 @@ public class TrainersController : ControllerBase
     /// </remarks>
     /// <param name="name">Optional substring that the trainer name must contain.</param>
     /// <param name="region">Optional substring that the trainer region must contain. Trainers without a region are excluded when set.</param>
-    /// <param name="minAge">Optional inclusive minimum age (1–99).</param>
-    /// <param name="maxAge">Optional inclusive maximum age (1–99).</param>
-    /// <param name="minWins">Optional inclusive minimum number of wins (non-negative).</param>
-    /// <param name="maxWins">Optional inclusive maximum number of wins (non-negative).</param>
-    /// <param name="minPokemonCount">Optional inclusive minimum number of owned Pokemon (non-negative).</param>
-    /// <param name="maxPokemonCount">Optional inclusive maximum number of owned Pokemon (non-negative).</param>
-    /// <param name="pageNumber">1-based page number to return (default: 1).</param>
-    /// <param name="pageSize">Number of items per page, 1–100 (default: 10).</param>
+    /// <param name="minAge">Optional inclusive minimum age. Trainers without an age are excluded when set.</param>
+    /// <param name="maxAge">Optional inclusive maximum age. Trainers without an age are excluded when set.</param>
+    /// <param name="minWins">Optional inclusive minimum number of wins.</param>
+    /// <param name="maxWins">Optional inclusive maximum number of wins.</param>
+    /// <param name="minPokemonCount">Optional inclusive minimum number of owned Pokemon.</param>
+    /// <param name="maxPokemonCount">Optional inclusive maximum number of owned Pokemon.</param>
+    /// <param name="pageNumber">1-based page number to return (default: 1). Values below 1 are not rejected up front and result in a 500.</param>
+    /// <param name="pageSize">Number of items per page (default: 10). The intended range is 1–100, but it is not enforced.</param>
     /// <param name="sortBy">
     /// Sort field: <c>name</c>, <c>region</c>, <c>age</c>, <c>wins</c>, <c>losses</c>, <c>pokemonCount</c>, or <c>createdAt</c> (default: <c>name</c>).
     /// </param>

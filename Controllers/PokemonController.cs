@@ -49,9 +49,12 @@ public class PokemonController : ControllerBase
     /// An <see cref="ApiResponse{T}"/> wrapping the updated <see cref="PokemonResponseDto"/>, including its new owner and moves.
     /// </returns>
     /// <response code="200">Pokemon was assigned to the trainer.</response>
-    /// <response code="400">Request body is invalid, or the Pokemon does not exist or is already owned.</response>
+    /// <response code="400">
+    /// The Pokemon does not exist or is already owned (<see cref="ApiResponse{T}"/> envelope).
+    /// Request body failed validation. Because of <c>[ApiController]</c>, this is returned as a standard ProblemDetails payload, not the <see cref="ApiResponse{T}"/> envelope.
+    /// </response>
     /// <response code="404">Trainer with the given ID does not exist.</response>
-    /// <response code="500">Unexpected server error.</response>
+    /// <response code="500">Unexpected server error. Also returned for a non-positive ID, because the service rejects it with an exception instead of a 400.</response>
     [HttpPost("trainers/{trainerId}/pokemon")]
     [ProducesResponseType(typeof(ApiResponse<PokemonResponseDto>), 200)]
     [ProducesResponseType(typeof(ApiResponse<object>), 400)]
@@ -69,8 +72,9 @@ public class PokemonController : ControllerBase
 
         try
         {
-            // Route validation: trainerId is only checked for existence, not sign. Zero, negative and
-            // unknown IDs all fall through to the same 404 response.
+            // Route validation happens in the service: TrainerExistsAsync throws ArgumentException for
+            // trainerId <= 0, which is caught below and surfaces as 500 (not 400). Positive but unknown
+            // IDs return false -> 404.
             var trainerExists = await _trainerService.TrainerExistsAsync(trainerId);
             if (!trainerExists)
             {
@@ -104,8 +108,10 @@ public class PokemonController : ControllerBase
     ///
     /// With no query parameters, every Pokemon is returned. When at least one parameter is supplied, a search is performed:
     /// level and ownership filters are applied exactly, while <paramref name="name"/>, <paramref name="type"/>, and
-    /// <paramref name="owner"/> are fuzzy-matched (partial matches and minor typos are tolerated). Search results are
-    /// ordered by match relevance, then by name.
+    /// <paramref name="owner"/> are fuzzy-matched (partial matches and minor typos are tolerated). When several text
+    /// filters are supplied, a Pokemon is included if <em>any</em> of them matches (OR, not AND). Results are ordered
+    /// by match relevance, then by name. Known quirk: supplying <paramref name="type"/> and <paramref name="owner"/>
+    /// without <paramref name="name"/> filters nothing out; every Pokemon is returned, ranked by relevance.
     ///
     /// Sample requests:
     ///
@@ -116,8 +122,8 @@ public class PokemonController : ControllerBase
     /// </remarks>
     /// <param name="name">Optional Pokemon name to fuzzy-match (partial matches and typos are tolerated).</param>
     /// <param name="type">Optional Pokemon type name to fuzzy-match (e.g. <c>fire</c>, <c>water</c>).</param>
-    /// <param name="minLevel">Optional inclusive minimum level (1–100). Must not exceed <paramref name="maxLevel"/>.</param>
-    /// <param name="maxLevel">Optional inclusive maximum level (1–100).</param>
+    /// <param name="minLevel">Optional inclusive minimum level. Must not exceed <paramref name="maxLevel"/>. Values outside 1–100 are not rejected.</param>
+    /// <param name="maxLevel">Optional inclusive maximum level. Values outside 1–100 are not rejected.</param>
     /// <param name="owner">Optional owner (trainer) name to fuzzy-match. Only Pokemon that have an owner can match.</param>
     /// <param name="hasOwner">Optional ownership filter: <c>true</c> for owned Pokemon only, <c>false</c> for wild (unowned) Pokemon only.</param>
     /// <returns>
@@ -208,13 +214,16 @@ public class PokemonController : ControllerBase
     /// </remarks>
     /// <param name="name">Optional substring that the Pokemon name must contain.</param>
     /// <param name="type">Optional substring that the Pokemon type name must contain.</param>
-    /// <param name="minLevel">Optional inclusive minimum level (1–100). Must not exceed <paramref name="maxLevel"/>.</param>
-    /// <param name="maxLevel">Optional inclusive maximum level (1–100).</param>
+    /// <param name="minLevel">Optional inclusive minimum level. Must not exceed <paramref name="maxLevel"/>. Values outside 1–100 are not rejected.</param>
+    /// <param name="maxLevel">Optional inclusive maximum level. Values outside 1–100 are not rejected.</param>
     /// <param name="owner">Optional substring that the owner (trainer) name must contain.</param>
     /// <param name="hasOwner">Optional ownership filter: <c>true</c> for owned Pokemon only, <c>false</c> for wild (unowned) Pokemon only.</param>
-    /// <param name="pageNumber">1-based page number to return (default: 1).</param>
-    /// <param name="pageSize">Number of items per page, 1–100 (default: 10).</param>
-    /// <param name="sortBy">Sort field: <c>name</c>, <c>level</c>, <c>caughtAt</c>, or <c>type</c> (default: <c>name</c>).</param>
+    /// <param name="pageNumber">1-based page number to return (default: 1). Values below 1 are not rejected up front and result in a 500.</param>
+    /// <param name="pageSize">Number of items per page (default: 10). The intended range is 1–100, but it is not enforced.</param>
+    /// <param name="sortBy">
+    /// Sort field: <c>name</c>, <c>level</c>, or <c>type</c> (default: <c>name</c>). <c>caughtAt</c> is advertised but
+    /// is currently rejected with 400 because of a case mismatch in the whitelist check.
+    /// </param>
     /// <param name="sortOrder">Sort direction: <c>asc</c> or <c>desc</c> (default: <c>asc</c>).</param>
     /// <returns>
     /// An <see cref="ApiResponse{T}"/> wrapping a <see cref="PaginatedResponse{T}"/> of <see cref="PokemonResponseDto"/>,
