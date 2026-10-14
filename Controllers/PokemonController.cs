@@ -278,7 +278,7 @@ public class PokemonController : ControllerBase
             if (!searchCriteria.IsValid())
             {
                 return BadRequest(ApiResponse<object>.ErrorResponse(
-                    "Invalid search criteria. Check level ranges, sort fields (name, level, caughtAt, type), and sort order (asc, desc).",
+                    "Invalid search criteria. Check level ranges, sort fields (name, level, caughtAt, type), and sort order (asc, desc).", 
                     400));
             }
 
