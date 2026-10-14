@@ -20,11 +20,17 @@ public class TrainerService : ITrainerService
     private const int DefaultWins = 0;
     private const int DefaultLosses = 0;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TrainerService"/> class.
+    /// </summary>
+    /// <param name="context">Request-scoped EF Core context used for all data access.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is <c>null</c>.</exception>
     public TrainerService(PokemonContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
+    /// <inheritdoc/>
     public async Task<TrainerResponseDto?> CreateTrainerAsync(CreateTrainerDto createTrainerDto)
     {
         ArgumentNullException.ThrowIfNull(createTrainerDto);
@@ -38,12 +44,14 @@ public class TrainerService : ITrainerService
         return MapToTrainerResponseDto(trainer);
     }
 
+    /// <inheritdoc/>
     public async Task<List<TrainerResponseDto>> GetAllTrainersAsync()
     {
         var trainers = await BuildBaseTrainerQuery().ToListAsync();
         return trainers.Select(MapToTrainerResponseDto).ToList();
     }
 
+    /// <inheritdoc/>
     public async Task<TrainerWithPokemonDto?> GetTrainerByIdAsync(int id)
     {
         ValidateId(id);
@@ -54,6 +62,7 @@ public class TrainerService : ITrainerService
         return trainer == null ? null : MapToTrainerWithPokemonDto(trainer);
     }
 
+    /// <inheritdoc/>
     public async Task<TrainerResponseDto?> UpdateTrainerAsync(int id, UpdateTrainerDto updateTrainerDto)
     {
         ValidateId(id);
@@ -72,6 +81,7 @@ public class TrainerService : ITrainerService
         return MapToTrainerResponseDto(trainer);
     }
 
+    /// <inheritdoc/>
     public async Task<bool> DeleteTrainerAsync(int id)
     {
         ValidateId(id);
@@ -93,6 +103,7 @@ public class TrainerService : ITrainerService
         return true;
     }
 
+    /// <inheritdoc/>
     public async Task<bool> TrainerExistsAsync(int id)
     {
         ValidateId(id);
@@ -102,6 +113,7 @@ public class TrainerService : ITrainerService
             .AnyAsync(t => t.Id == id);
     }
 
+    /// <inheritdoc/>
     public async Task<PaginatedResponse<TrainerResponseDto>> GetPaginatedTrainersAsync(PaginatedTrainerSearchDto searchCriteria)
     {
         ArgumentNullException.ThrowIfNull(searchCriteria);

@@ -149,13 +149,18 @@ public class MoveResponseDto
 /// </summary>
 /// <remarks>
 /// Built from the query string of <c>GET /api/pokemon</c> when at least one criterion is supplied; with no criteria
-/// the endpoint returns all Pokemon. All fields are optional and combined with AND semantics.
+/// the endpoint returns all Pokemon. All fields are optional. Level and ownership filters are AND-combined, while the
+/// text criteria are OR-combined: a Pokemon is kept if any supplied text criterion matches.
 /// <para>
 /// Text criteria (<see cref="Name"/>, <see cref="Type"/>, <see cref="Owner"/>) use case-insensitive fuzzy matching,
 /// so small typos still match. Results are ordered by relevance score, where type matches are weighted at 0.8
 /// and owner matches at 0.6 relative to name matches.
 /// </para>
 /// <para>Call <see cref="IsValid"/> to check cross-field rules not covered by data annotations.</para>
+/// <para>
+/// The controller builds this DTO manually from query parameters, so its <c>[Range]</c> annotations are not
+/// evaluated; only <see cref="IsValid"/> is checked.
+/// </para>
 /// </remarks>
 /// <example>
 /// <code>
@@ -181,7 +186,7 @@ public class PokemonSearchDto
     /// <summary>
     /// Inclusive lower bound on the Pokemon's level.
     /// </summary>
-    /// <remarks>Optional. Must be between 1 and 100, and not greater than <see cref="MaxLevel"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be greater than <see cref="MaxLevel"/> when both are set. The annotated range (between 1 and 100) is not enforced.</remarks>
     [JsonPropertyName("minLevel")]
     [Range(1, 100, ErrorMessage = "MinLevel must be between 1 and 100")]
     public int? MinLevel { get; set; }
@@ -189,7 +194,7 @@ public class PokemonSearchDto
     /// <summary>
     /// Inclusive upper bound on the Pokemon's level.
     /// </summary>
-    /// <remarks>Optional. Must be between 1 and 100, and not less than <see cref="MinLevel"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be less than <see cref="MinLevel"/> when both are set. The annotated range (between 1 and 100) is not enforced.</remarks>
     [JsonPropertyName("maxLevel")]
     [Range(1, 100, ErrorMessage = "MaxLevel must be between 1 and 100")]
     public int? MaxLevel { get; set; }
@@ -225,6 +230,10 @@ public class PokemonSearchDto
 /// filters here use case-insensitive substring ("contains") matching rather than fuzzy matching, and results are
 /// ordered by <see cref="SortBy"/> rather than relevance. All filters are optional and combined with AND semantics.
 /// <para>Call <see cref="IsValid"/> to check cross-field and sort-option rules not covered by data annotations.</para>
+/// <para>
+/// The controller builds this DTO manually from query parameters, so its <c>[Range]</c> annotations are not
+/// evaluated; only <see cref="IsValid"/> is checked.
+/// </para>
 /// </remarks>
 /// <example>
 /// <code>
@@ -250,7 +259,7 @@ public class PaginatedPokemonSearchDto
     /// <summary>
     /// Inclusive lower bound on the Pokemon's level.
     /// </summary>
-    /// <remarks>Optional. Must be between 1 and 100, and not greater than <see cref="MaxLevel"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be greater than <see cref="MaxLevel"/> when both are set. The annotated range (between 1 and 100) is not enforced.</remarks>
     [JsonPropertyName("minLevel")]
     [Range(1, 100, ErrorMessage = "MinLevel must be between 1 and 100")]
     public int? MinLevel { get; set; }
@@ -258,7 +267,7 @@ public class PaginatedPokemonSearchDto
     /// <summary>
     /// Inclusive upper bound on the Pokemon's level.
     /// </summary>
-    /// <remarks>Optional. Must be between 1 and 100, and not less than <see cref="MinLevel"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be less than <see cref="MinLevel"/> when both are set. The annotated range (between 1 and 100) is not enforced.</remarks>
     [JsonPropertyName("maxLevel")]
     [Range(1, 100, ErrorMessage = "MaxLevel must be between 1 and 100")]
     public int? MaxLevel { get; set; }
@@ -279,7 +288,10 @@ public class PaginatedPokemonSearchDto
     /// <summary>
     /// 1-based page number to return. Defaults to 1.
     /// </summary>
-    /// <remarks>Must be 1 or greater. Pages past the last page return an empty list.</remarks>
+    /// <remarks>
+    /// Intended to be 1 or greater, but not validated: values below 1 cause a server error (500).
+    /// Pages past the last page return an empty list.
+    /// </remarks>
     [JsonPropertyName("pageNumber")]
     [Range(1, int.MaxValue, ErrorMessage = "Page number must be greater than 0")]
     public int PageNumber { get; set; } = 1;
@@ -287,7 +299,7 @@ public class PaginatedPokemonSearchDto
     /// <summary>
     /// Number of items per page. Defaults to 10.
     /// </summary>
-    /// <remarks>Must be between 1 and 100.</remarks>
+    /// <remarks>The intended range is 1-100, but it is not validated or capped.</remarks>
     [JsonPropertyName("pageSize")]
     [Range(1, 100, ErrorMessage = "Page size must be between 1 and 100")]
     public int PageSize { get; set; } = 10;
@@ -296,8 +308,9 @@ public class PaginatedPokemonSearchDto
     /// Field to sort by. Defaults to <c>"name"</c>.
     /// </summary>
     /// <remarks>
-    /// Case-insensitive; one of <c>name</c>, <c>level</c>, <c>caughtAt</c>, <c>type</c> (sorts by type name).
-    /// When sorting by <c>caughtAt</c>, Pokemon without a catch date sort as the earliest.
+    /// Case-insensitive; one of <c>name</c>, <c>level</c>, <c>type</c> (sorts by type name).
+    /// <c>caughtAt</c> is in the whitelist but is currently always rejected: <see cref="IsValid"/> lower-cases the
+    /// input before comparing it with the mixed-case entry.
     /// </remarks>
     [JsonPropertyName("sortBy")]
     public string? SortBy { get; set; } = "name";
@@ -315,6 +328,7 @@ public class PaginatedPokemonSearchDto
     /// <returns>
     /// <c>true</c> when <see cref="MinLevel"/> does not exceed <see cref="MaxLevel"/> (if both are set),
     /// and <see cref="SortBy"/> and <see cref="SortOrder"/> are empty or one of the allowed values.
+    /// <c>caughtAt</c> never passes; see <see cref="SortBy"/>.
     /// </returns>
     public bool IsValid()
     {

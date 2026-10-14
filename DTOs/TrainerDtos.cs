@@ -53,7 +53,8 @@ public class CreateTrainerDto
 /// <remarks>
 /// Request body for <c>PATCH /api/trainers/{id}</c>. Performs a partial update: only fields that are present
 /// are applied, while omitted or <c>null</c> fields leave the stored value unchanged. An empty <see cref="Name"/>
-/// is also ignored. Because <c>null</c> means "unchanged", optional fields cannot be cleared through this DTO.
+/// is also ignored. Because <c>null</c> means "unchanged", <see cref="Age"/>, <see cref="Wins"/> and <see cref="Losses"/>
+/// cannot be cleared through this DTO; <see cref="Region"/> can be cleared by sending an empty string.
 /// </remarks>
 /// <example>
 /// Change only the trainer's region and win count:
@@ -213,6 +214,10 @@ public class TrainerWithPokemonDto : TrainerResponseDto
 /// Built from the query string of <c>GET /api/trainers/paginated</c>. All filters are optional and combined with
 /// AND semantics; text filters use case-insensitive substring ("contains") matching and all range bounds are inclusive.
 /// <para>Call <see cref="IsValid"/> to check cross-field and sort-option rules not covered by data annotations.</para>
+/// <para>
+/// The controller builds this DTO manually from query parameters, so its <c>[Range]</c> annotations are not
+/// evaluated; only <see cref="IsValid"/> is checked.
+/// </para>
 /// </remarks>
 /// <example>
 /// <code>
@@ -238,7 +243,7 @@ public class PaginatedTrainerSearchDto
     /// <summary>
     /// Inclusive lower bound on the trainer's age.
     /// </summary>
-    /// <remarks>Optional. Must be between 1 and 99, and not greater than <see cref="MaxAge"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be greater than <see cref="MaxAge"/> when both are set. The annotated range (between 1 and 99) is not enforced.</remarks>
     [JsonPropertyName("minAge")]
     [Range(1, 99, ErrorMessage = "MinAge must be between 1 and 99")]
     public int? MinAge { get; set; }
@@ -246,7 +251,7 @@ public class PaginatedTrainerSearchDto
     /// <summary>
     /// Inclusive upper bound on the trainer's age.
     /// </summary>
-    /// <remarks>Optional. Must be between 1 and 99, and not less than <see cref="MinAge"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be less than <see cref="MinAge"/> when both are set. The annotated range (between 1 and 99) is not enforced.</remarks>
     [JsonPropertyName("maxAge")]
     [Range(1, 99, ErrorMessage = "MaxAge must be between 1 and 99")]
     public int? MaxAge { get; set; }
@@ -254,7 +259,7 @@ public class PaginatedTrainerSearchDto
     /// <summary>
     /// Inclusive lower bound on the number of battles won.
     /// </summary>
-    /// <remarks>Optional. Must be 0 or greater, and not greater than <see cref="MaxWins"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be greater than <see cref="MaxWins"/> when both are set. The annotated range (0 or greater) is not enforced.</remarks>
     [JsonPropertyName("minWins")]
     [Range(0, int.MaxValue, ErrorMessage = "MinWins must be non-negative")]
     public int? MinWins { get; set; }
@@ -262,7 +267,7 @@ public class PaginatedTrainerSearchDto
     /// <summary>
     /// Inclusive upper bound on the number of battles won.
     /// </summary>
-    /// <remarks>Optional. Must be 0 or greater, and not less than <see cref="MinWins"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be less than <see cref="MinWins"/> when both are set. The annotated range (0 or greater) is not enforced.</remarks>
     [JsonPropertyName("maxWins")]
     [Range(0, int.MaxValue, ErrorMessage = "MaxWins must be non-negative")]
     public int? MaxWins { get; set; }
@@ -270,7 +275,7 @@ public class PaginatedTrainerSearchDto
     /// <summary>
     /// Inclusive lower bound on the number of Pokemon the trainer owns.
     /// </summary>
-    /// <remarks>Optional. Must be 0 or greater, and not greater than <see cref="MaxPokemonCount"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be greater than <see cref="MaxPokemonCount"/> when both are set. The annotated range (0 or greater) is not enforced.</remarks>
     [JsonPropertyName("minPokemonCount")]
     [Range(0, int.MaxValue, ErrorMessage = "MinPokemonCount must be non-negative")]
     public int? MinPokemonCount { get; set; }
@@ -278,7 +283,7 @@ public class PaginatedTrainerSearchDto
     /// <summary>
     /// Inclusive upper bound on the number of Pokemon the trainer owns.
     /// </summary>
-    /// <remarks>Optional. Must be 0 or greater, and not less than <see cref="MinPokemonCount"/> when both are set.</remarks>
+    /// <remarks>Optional. Must not be less than <see cref="MinPokemonCount"/> when both are set. The annotated range (0 or greater) is not enforced.</remarks>
     [JsonPropertyName("maxPokemonCount")]
     [Range(0, int.MaxValue, ErrorMessage = "MaxPokemonCount must be non-negative")]
     public int? MaxPokemonCount { get; set; }
@@ -286,7 +291,10 @@ public class PaginatedTrainerSearchDto
     /// <summary>
     /// 1-based page number to return. Defaults to 1.
     /// </summary>
-    /// <remarks>Must be 1 or greater. Pages past the last page return an empty list.</remarks>
+    /// <remarks>
+    /// Intended to be 1 or greater, but not validated: values below 1 cause a server error (500).
+    /// Pages past the last page return an empty list.
+    /// </remarks>
     [JsonPropertyName("pageNumber")]
     [Range(1, int.MaxValue, ErrorMessage = "Page number must be greater than 0")]
     public int PageNumber { get; set; } = 1;
@@ -294,7 +302,7 @@ public class PaginatedTrainerSearchDto
     /// <summary>
     /// Number of items per page. Defaults to 10.
     /// </summary>
-    /// <remarks>Must be between 1 and 100.</remarks>
+    /// <remarks>The intended range is 1-100, but it is not validated or capped.</remarks>
     [JsonPropertyName("pageSize")]
     [Range(1, 100, ErrorMessage = "Page size must be between 1 and 100")]
     public int PageSize { get; set; } = 10;

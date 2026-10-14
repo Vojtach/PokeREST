@@ -4,6 +4,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PokeREST.Models;
 
+/// <summary>
+/// EF Core context for the PostgreSQL database, the only data-access layer in the app (there are no repositories;
+/// services query this context directly).
+/// </summary>
+/// <remarks>
+/// Scaffolded database-first: table, constraint and column names mirror the existing schema. Put customizations in
+/// a separate partial class via <c>OnModelCreatingPartial</c> so they survive re-scaffolding.
+/// <see cref="PokemonMoveDetails"/> and <see cref="PokemonWithTypes"/> map keyless database views and are not
+/// used by the current API.
+/// </remarks>
 public partial class PokemonContext : DbContext
 {
     public PokemonContext()

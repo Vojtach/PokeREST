@@ -6,7 +6,8 @@ namespace PokeREST.DTOs;
 /// Generic API response wrapper providing consistent response format with success status, message, and data.
 /// </summary>
 /// <remarks>
-/// Every endpoint returns its payload wrapped in this envelope. On success <see cref="Data"/> holds the result;
+/// Every endpoint returns its payload wrapped in this envelope, except request-body validation failures, which
+/// <c>[ApiController]</c> answers with a standard ProblemDetails 400 before the action runs. On success <see cref="Data"/> holds the result;
 /// on failure <see cref="Data"/> is <c>null</c> and <see cref="Message"/> explains the error.
 /// Construct instances through <see cref="SuccessResponse"/> and <see cref="ErrorResponse"/> rather than directly.
 /// </remarks>
@@ -150,7 +151,7 @@ public class PaginatedResponse<T>
     public int PageNumber { get; set; }
 
     /// <summary>
-    /// Maximum number of items per page (echoes the request, 1-100).
+    /// Maximum number of items per page (echoes the request; the intended 1-100 range is not enforced).
     /// </summary>
     [JsonPropertyName("pageSize")]
     public int PageSize { get; set; }

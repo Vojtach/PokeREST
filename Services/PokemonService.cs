@@ -23,11 +23,17 @@ public class PokemonService : IPokemonService
     private const double TypeMatchWeighting = 0.8;
     private const double OwnerMatchWeighting = 0.6;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PokemonService"/> class.
+    /// </summary>
+    /// <param name="context">Request-scoped EF Core context used for all data access.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is <c>null</c>.</exception>
     public PokemonService(PokemonContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
+    /// <inheritdoc/>
     public async Task<PokemonResponseDto?> AddExistingPokemonToTrainerAsync(int trainerId, int pokemonId)
     {
         var trainer = await _context.Trainers.FindAsync(trainerId);
@@ -64,12 +70,14 @@ public class PokemonService : IPokemonService
         return MapToPokemonResponseDto(pokemon);
     }
 
+    /// <inheritdoc/>
     public async Task<List<PokemonResponseDto>> GetAllPokemonAsync()
     {
         var pokemon = await BuildBasePokemonQuery().ToListAsync();
         return pokemon.Select(MapToPokemonResponseDto).ToList();
     }
 
+    /// <inheritdoc/>
     public async Task<List<PokemonResponseDto>> SearchPokemonAsync(PokemonSearchDto searchCriteria)
     {
         ArgumentNullException.ThrowIfNull(searchCriteria);
@@ -86,6 +94,7 @@ public class PokemonService : IPokemonService
         return SortSearchResults(searchResults);
     }
 
+    /// <inheritdoc/>
     public async Task<PaginatedResponse<PokemonResponseDto>> GetPaginatedPokemonAsync(PaginatedPokemonSearchDto searchCriteria)
     {
         ArgumentNullException.ThrowIfNull(searchCriteria);
