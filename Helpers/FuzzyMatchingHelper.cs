@@ -2,6 +2,10 @@ using System.Globalization;
 
 namespace PokeREST.Helpers;
 
+/// <summary>
+/// Typo-tolerant string matching used by the Pokemon search endpoint.
+/// Combines exact, substring, and Levenshtein-similarity checks on trimmed, lower-cased input.
+/// </summary>
 public static class FuzzyMatchingHelper
 {
     /// <summary>
@@ -10,6 +14,7 @@ public static class FuzzyMatchingHelper
     /// <param name="source">First string</param>
     /// <param name="target">Second string</param>
     /// <returns>The number of single-character edits required to change source into target</returns>
+    /// <remarks>Case-sensitive; callers are expected to normalize input first.</remarks>
     public static int LevenshteinDistance(string source, string target)
     {
         if (string.IsNullOrEmpty(source))
@@ -78,11 +83,13 @@ public static class FuzzyMatchingHelper
         if (normalizedTarget.Equals(normalizedSearchTerm))
             return true;
 
-        // Contains match (partial)
+        // Contains match (partial). Checked in both directions, so a short target such as type "fire" also
+        // matches the longer search term "firebird", and a one-letter search term matches any target containing it.
         if (normalizedTarget.Contains(normalizedSearchTerm) || normalizedSearchTerm.Contains(normalizedTarget))
             return true;
 
-        // Fuzzy match using similarity score
+        // Fuzzy match using similarity score. With the default 0.6 threshold, up to 40% of the longer string's
+        // characters may differ.
         var similarity = CalculateSimilarity(normalizedSearchTerm, normalizedTarget);
         return similarity >= threshold;
     }
@@ -91,6 +98,10 @@ public static class FuzzyMatchingHelper
     /// Gets a match score for ranking search results
     /// Higher score = better match
     /// </summary>
+    /// <remarks>
+    /// Tiers: exact 100, prefix 90, substring 80, reverse substring 70, otherwise similarity scaled to 0-60.
+    /// Does not apply a threshold itself; pair it with <see cref="IsFuzzyMatch"/>.
+    /// </remarks>
     /// <param name="searchTerm">The term being searched for</param>
     /// <param name="targetString">The string to match against</param>
     /// <returns>Match score (higher is better)</returns>

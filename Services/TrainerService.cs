@@ -20,11 +20,17 @@ public class TrainerService : ITrainerService
     private const int DefaultWins = 0;
     private const int DefaultLosses = 0;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TrainerService"/> class.
+    /// </summary>
+    /// <param name="context">Request-scoped EF Core context used for all data access.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is <c>null</c>.</exception>
     public TrainerService(PokemonContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
+    /// <inheritdoc/>
     public async Task<TrainerResponseDto?> CreateTrainerAsync(CreateTrainerDto createTrainerDto)
     {
         ArgumentNullException.ThrowIfNull(createTrainerDto);
@@ -34,15 +40,18 @@ public class TrainerService : ITrainerService
         _context.Trainers.Add(trainer);
         await _context.SaveChangesAsync();
 
+        // Never null in practice: failures surface as exceptions from SaveChangesAsync.
         return MapToTrainerResponseDto(trainer);
     }
 
+    /// <inheritdoc/>
     public async Task<List<TrainerResponseDto>> GetAllTrainersAsync()
     {
         var trainers = await BuildBaseTrainerQuery().ToListAsync();
         return trainers.Select(MapToTrainerResponseDto).ToList();
     }
 
+    /// <inheritdoc/>
     public async Task<TrainerWithPokemonDto?> GetTrainerByIdAsync(int id)
     {
         ValidateId(id);
@@ -53,6 +62,7 @@ public class TrainerService : ITrainerService
         return trainer == null ? null : MapToTrainerWithPokemonDto(trainer);
     }
 
+    /// <inheritdoc/>
     public async Task<TrainerResponseDto?> UpdateTrainerAsync(int id, UpdateTrainerDto updateTrainerDto)
     {
         ValidateId(id);
@@ -65,15 +75,20 @@ public class TrainerService : ITrainerService
         ApplyUpdatesToTrainer(trainer, updateTrainerDto);
         
         await _context.SaveChangesAsync();
+        // FindAsync does not load navigations; without this, PokemonCount in the response would always be 0.
         await LoadTrainerPokemonCollection(trainer);
 
         return MapToTrainerResponseDto(trainer);
     }
 
+    /// <inheritdoc/>
     public async Task<bool> DeleteTrainerAsync(int id)
     {
         ValidateId(id);
 
+        // Pokemons are loaded so they are tracked and can be released in the same SaveChanges. The Owner FK is
+        // optional (ClientSetNull), so the database does not null OwnerId itself; untracked Pokemon would
+        // violate Pokemon_OwnerId_fkey when the trainer row is removed.
         var trainer = await _context.Trainers
             .Include(t => t.Pokemons)
             .FirstOrDefaultAsync(t => t.Id == id);
@@ -88,6 +103,7 @@ public class TrainerService : ITrainerService
         return true;
     }
 
+    /// <inheritdoc/>
     public async Task<bool> TrainerExistsAsync(int id)
     {
         ValidateId(id);
@@ -97,6 +113,7 @@ public class TrainerService : ITrainerService
             .AnyAsync(t => t.Id == id);
     }
 
+    /// <inheritdoc/>
     public async Task<PaginatedResponse<TrainerResponseDto>> GetPaginatedTrainersAsync(PaginatedTrainerSearchDto searchCriteria)
     {
         ArgumentNullException.ThrowIfNull(searchCriteria);
@@ -167,6 +184,10 @@ public class TrainerService : ITrainerService
     /// <summary>
     /// Applies search filters to the trainer query.
     /// </summary>
+    /// <remarks>
+    /// All filters are AND-combined and translated to SQL. Text filters are case-insensitive substring matches.
+    /// Range filters on nullable columns (Age, Wins) exclude trainers whose value is null.
+    /// </remarks>
     private static IQueryable<Trainer> ApplySearchFilters(IQueryable<Trainer> query, PaginatedTrainerSearchDto searchCriteria)
     {
         query = ApplyNameFilter(query, searchCriteria.Name);
@@ -261,6 +282,11 @@ public class TrainerService : ITrainerService
     /// <summary>
     /// Applies sorting to the trainer query.
     /// </summary>
+    /// <remarks>
+    /// Nullable columns are coalesced (empty region, 0 age/wins/losses, <see cref="DateTime.MinValue"/> for createdAt),
+    /// so trainers with missing values sort first in ascending order. Only a single sort key is applied, with no
+    /// tie-breaker, so trainers with equal keys may appear on different pages between requests.
+    /// </remarks>
     private static IQueryable<Trainer> ApplySorting(IQueryable<Trainer> query, string? sortBy, string? sortOrder)
     {
         var normalizedSortBy = sortBy?.ToLower() ?? DefaultSortField;
@@ -333,6 +359,8 @@ public class TrainerService : ITrainerService
     /// </summary>
     private static IQueryable<Trainer> ApplyPagination(IQueryable<Trainer> query, int pageNumber, int pageSize)
     {
+        // No guard here or in the controller: pageNumber < 1 or a negative pageSize yields a negative
+        // OFFSET/LIMIT, which the database rejects, so the request ends in a 500.
         var skipCount = (pageNumber - 1) * pageSize;
         return query.Skip(skipCount).Take(pageSize);
     }
@@ -391,6 +419,7 @@ public class TrainerService : ITrainerService
         int totalItems, 
         PaginatedTrainerSearchDto searchCriteria)
     {
+        // pageSize 0 is not rejected: the division yields Infinity/NaN, so TotalPages is meaningless and Data is empty.
         var totalPages = (int)Math.Ceiling((double)totalItems / searchCriteria.PageSize);
         
         return new PaginatedResponse<TrainerResponseDto>
@@ -412,6 +441,10 @@ public class TrainerService : ITrainerService
     /// <summary>
     /// Validates that the ID is positive.
     /// </summary>
+    /// <remarks>
+    /// Controllers do not translate the resulting <see cref="ArgumentException"/> into a 400; it is caught by their
+    /// generic handler, so a non-positive ID currently produces a 500 response.
+    /// </remarks>
     private static void ValidateId(int id)
     {
         if (id <= 0)
@@ -425,6 +458,10 @@ public class TrainerService : ITrainerService
     /// <summary>
     /// Maps a Trainer entity to TrainerResponseDto.
     /// </summary>
+    /// <remarks>
+    /// PokemonCount is taken from the loaded Pokemons collection, so callers must include or load it first;
+    /// otherwise the count is silently reported as 0.
+    /// </remarks>
     private static TrainerResponseDto MapToTrainerResponseDto(Trainer trainer)
     {
         return new TrainerResponseDto
@@ -462,6 +499,9 @@ public class TrainerService : ITrainerService
     /// <summary>
     /// Maps a Pokemon entity to PokemonResponseDto.
     /// </summary>
+    /// <remarks>
+    /// Duplicates the mapping in PokemonService; keep the two in sync.
+    /// </remarks>
     private static PokemonResponseDto MapToPokemonResponseDto(Pokemon pokemon)
     {
         return new PokemonResponseDto

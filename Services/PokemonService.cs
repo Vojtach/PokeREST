@@ -19,14 +19,21 @@ public class PokemonService : IPokemonService
     private const string DefaultSortField = "name";
     private const string DefaultSortOrder = "asc";
     private const string DescendingSortOrder = "desc";
+    // Fuzzy search ranks name matches above type matches, and type matches above owner matches.
     private const double TypeMatchWeighting = 0.8;
     private const double OwnerMatchWeighting = 0.6;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PokemonService"/> class.
+    /// </summary>
+    /// <param name="context">Request-scoped EF Core context used for all data access.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="context"/> is <c>null</c>.</exception>
     public PokemonService(PokemonContext context)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
+    /// <inheritdoc/>
     public async Task<PokemonResponseDto?> AddExistingPokemonToTrainerAsync(int trainerId, int pokemonId)
     {
         var trainer = await _context.Trainers.FindAsync(trainerId);
@@ -35,6 +42,8 @@ public class PokemonService : IPokemonService
             return null;
         }
 
+        // Tracked query (no AsNoTracking) because the entity is modified below. Owner is not included;
+        // it is assigned manually so the mapped response carries the new owner's name.
         var pokemon = await _context.Pokemons
             .Include(p => p.Type)
             .Include(p => p.PokemonMoves)
@@ -45,11 +54,15 @@ public class PokemonService : IPokemonService
         if (pokemon == null || pokemon.OwnerId.HasValue)
         {
             // Pokemon not found or already has an owner. Pokemon was most likely already "caught".
+            // This check-then-set has no concurrency token, so two simultaneous requests for the same
+            // wild Pokemon can both pass it; the last SaveChanges wins.
             return null;
         }
 
         pokemon.OwnerId = trainerId;
         pokemon.Owner = trainer;
+        // The column is "timestamp without time zone", and Npgsql refuses to write a UTC-kind DateTime to it,
+        // so the UTC value is stored with an unspecified kind.
         pokemon.CaughtAt = DateTime.SpecifyKind(DateTime.UtcNow, DateTimeKind.Unspecified); // TODO: Change DB column to "timestamp with time zone" for long term reliability
 
         await _context.SaveChangesAsync();
@@ -57,16 +70,20 @@ public class PokemonService : IPokemonService
         return MapToPokemonResponseDto(pokemon);
     }
 
+    /// <inheritdoc/>
     public async Task<List<PokemonResponseDto>> GetAllPokemonAsync()
     {
         var pokemon = await BuildBasePokemonQuery().ToListAsync();
         return pokemon.Select(MapToPokemonResponseDto).ToList();
     }
 
+    /// <inheritdoc/>
     public async Task<List<PokemonResponseDto>> SearchPokemonAsync(PokemonSearchDto searchCriteria)
     {
         ArgumentNullException.ThrowIfNull(searchCriteria);
 
+        // Level and ownership filters run in SQL. Fuzzy text matching cannot be translated, so every
+        // remaining row (with type, owner and moves) is loaded and scored in memory; cost grows with table size.
         var query = BuildBasePokemonQuery();
         query = ApplyLevelFilters(query, searchCriteria);
         query = ApplyOwnershipFilter(query, searchCriteria.HasOwner);
@@ -77,6 +94,7 @@ public class PokemonService : IPokemonService
         return SortSearchResults(searchResults);
     }
 
+    /// <inheritdoc/>
     public async Task<PaginatedResponse<PokemonResponseDto>> GetPaginatedPokemonAsync(PaginatedPokemonSearchDto searchCriteria)
     {
         ArgumentNullException.ThrowIfNull(searchCriteria);
@@ -84,6 +102,7 @@ public class PokemonService : IPokemonService
         var query = BuildBasePokemonQuery();
         query = ApplyPaginatedSearchFilters(query, searchCriteria);
 
+        // Total is counted after filtering but before paging, so TotalItems/TotalPages describe the whole result set.
         var totalItems = await query.CountAsync();
         
         query = ApplySorting(query, searchCriteria.SortBy, searchCriteria.SortOrder);
@@ -175,6 +194,13 @@ public class PokemonService : IPokemonService
     /// <summary>
     /// Calculates the match score for a Pokemon against search criteria.
     /// </summary>
+    /// <remarks>
+    /// The score is the sum of the per-criterion scores (name 0-100, type x0.8, owner x0.6). Text criteria are
+    /// OR-combined: the Pokemon is kept if any supplied criterion matched. A criterion that fails while it is
+    /// the only text filter excludes the Pokemon immediately (the <c>shouldSkip</c> flag).
+    /// Quirk: <see cref="ProcessNameMatching"/> reports <c>matched = true</c> when no name filter is given,
+    /// so a search with type and owner but no name never excludes anything; non-matches just score 0.
+    /// </remarks>
     private (double score, bool matchFound) CalculatePokemonMatchScore(
         Pokemon pokemon, PokemonSearchDto searchCriteria, bool hasTextCriteria)
     {
@@ -300,6 +326,10 @@ public class PokemonService : IPokemonService
     /// <summary>
     /// Applies all search filters for paginated results.
     /// </summary>
+    /// <remarks>
+    /// Unlike <see cref="SearchPokemonAsync"/>, text filters are case-insensitive substring matches that EF
+    /// translates to SQL (no typo tolerance), and all filters are AND-combined.
+    /// </remarks>
     private static IQueryable<Pokemon> ApplyPaginatedSearchFilters(
         IQueryable<Pokemon> query, PaginatedPokemonSearchDto searchCriteria)
     {
@@ -337,6 +367,12 @@ public class PokemonService : IPokemonService
     /// <summary>
     /// Applies sorting to the query based on the specified criteria.
     /// </summary>
+    /// <remarks>
+    /// The "caughtat" branch is currently unreachable from the API: <see cref="PaginatedPokemonSearchDto.IsValid"/>
+    /// lower-cases sortBy but whitelists "caughtAt", so that value is rejected before reaching this method.
+    /// Only a single sort key is applied, with no tie-breaker, so rows with equal keys (e.g. duplicate names)
+    /// may appear on different pages between requests.
+    /// </remarks>
     private static IQueryable<Pokemon> ApplySorting(
         IQueryable<Pokemon> query, string? sortBy, string? sortOrder)
     {
@@ -353,6 +389,7 @@ public class PokemonService : IPokemonService
                 ? query.OrderByDescending(p => p.Level) 
                 : query.OrderBy(p => p.Level),
             "caughtat" => isDescending 
+                // Never-caught Pokemon (null CaughtAt) sort first in ascending order.
                 ? query.OrderByDescending(p => p.CaughtAt ?? DateTime.MinValue) 
                 : query.OrderBy(p => p.CaughtAt ?? DateTime.MinValue),
             "type" => isDescending 
@@ -368,6 +405,8 @@ public class PokemonService : IPokemonService
     private static IQueryable<Pokemon> ApplyPagination(
         IQueryable<Pokemon> query, int pageNumber, int pageSize)
     {
+        // No guard here or in the controller: pageNumber < 1 or a negative pageSize yields a negative
+        // OFFSET/LIMIT, which the database rejects, so the request ends in a 500.
         var skipCount = (pageNumber - 1) * pageSize;
         return query.Skip(skipCount).Take(pageSize);
     }
@@ -378,6 +417,7 @@ public class PokemonService : IPokemonService
     private static PaginatedResponse<PokemonResponseDto> CreatePaginatedResponse(
         List<PokemonResponseDto> pokemonDtos, int totalItems, PaginatedPokemonSearchDto searchCriteria)
     {
+        // pageSize 0 is not rejected: the division yields Infinity/NaN, so TotalPages is meaningless and Data is empty.
         var totalPages = (int)Math.Ceiling((double)totalItems / searchCriteria.PageSize);
 
         return new PaginatedResponse<PokemonResponseDto>
@@ -395,6 +435,10 @@ public class PokemonService : IPokemonService
     /// <summary>
     /// Maps a Pokemon entity to a PokemonResponseDto.
     /// </summary>
+    /// <remarks>
+    /// Requires Type and PokemonMoves.Move.Type to be loaded (see <see cref="BuildBasePokemonQuery"/>); otherwise it
+    /// throws a NullReferenceException. TrainerService has its own copy of this mapping; keep the two in sync.
+    /// </remarks>
     private static PokemonResponseDto MapToPokemonResponseDto(Pokemon pokemon)
     {
         ArgumentNullException.ThrowIfNull(pokemon);

@@ -12,7 +12,7 @@ public interface IPokemonService
     /// </summary>
     /// <param name="trainerId">The unique identifier of the trainer who will own the Pokemon.</param>
     /// <param name="pokemonId">The unique identifier of the Pokemon to be assigned.</param>
-    /// <returns>The updated Pokemon information if successful; otherwise, null if the Pokemon is already owned or doesn't exist.</returns>
+    /// <returns>The updated Pokemon information if successful; otherwise, null if the trainer or Pokemon doesn't exist, or the Pokemon is already owned.</returns>
     Task<PokemonResponseDto?> AddExistingPokemonToTrainerAsync(int trainerId, int pokemonId);
     
     /// <summary>
@@ -24,6 +24,7 @@ public interface IPokemonService
     /// <summary>
     /// Searches for Pokemon using fuzzy matching algorithms with multiple filter criteria.
     /// Supports partial name matching, type filtering, level ranges, and owner-based searches.
+    /// Level and ownership filters are applied exactly; name, type and owner are OR-combined fuzzy matches.
     /// </summary>
     /// <param name="searchCriteria">The search parameters including name, type, level range, and ownership filters.</param>
     /// <returns>A list of Pokemon matching the search criteria, ordered by relevance score.</returns>
@@ -31,7 +32,8 @@ public interface IPokemonService
     
     /// <summary>
     /// Retrieves Pokemon with advanced filtering, sorting, and pagination support.
-    /// Provides efficient querying for large datasets with customizable page sizes and sort options.
+    /// Filtering, sorting and paging run in the database. Text filters are case-insensitive substring matches,
+    /// not fuzzy matches, and paging values are used as given without validation.
     /// </summary>
     /// <param name="searchCriteria">The paginated search parameters including filters, sorting, and pagination settings.</param>
     /// <returns>A paginated response containing Pokemon data and pagination metadata.</returns>
