@@ -54,6 +54,13 @@ public class TrainersController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), 400)]
     public async Task<ActionResult<ApiResponse<TrainerResponseDto>>> CreateTrainer([FromBody] CreateTrainerDto createTrainerDto)
     {
+        // Body validation (CreateTrainerDto data annotations):
+        //   - Name: required, 1..100 characters
+        //   - Region: optional, max 50 characters
+        //   - Age: optional, 1..99
+        // Because of [ApiController] (SuppressModelStateInvalidFilter = false in Program.cs), an invalid
+        // body is normally rejected with a 400 ProblemDetails before this action runs. This check is a
+        // defensive fallback that returns our ApiResponse envelope when the action is invoked directly.
         if (!ModelState.IsValid)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("Invalid input data", 400));
@@ -61,6 +68,8 @@ public class TrainersController : ControllerBase
 
         try
         {
+            // Defensive: the current service never returns null on success, but a null result is
+            // still mapped to 400 so the endpoint never responds 201 without a created resource.
             var trainer = await _trainerService.CreateTrainerAsync(createTrainerDto);
             if (trainer == null)
             {
@@ -130,6 +139,8 @@ public class TrainersController : ControllerBase
     {
         try
         {
+            // Route validation happens in the service: ids <= 0 throw ArgumentException, which is caught
+            // below and surfaces as 500 (not 400). Positive but unknown ids return null -> 404.
             var trainer = await _trainerService.GetTrainerByIdAsync(id);
             if (trainer == null)
             {
@@ -176,6 +187,14 @@ public class TrainersController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), 404)]
     public async Task<ActionResult<ApiResponse<TrainerResponseDto>>> UpdateTrainer(int id, [FromBody] UpdateTrainerDto updateTrainerDto)
     {
+        // Body validation (UpdateTrainerDto data annotations). Every field is optional (PATCH semantics),
+        // but any field that is supplied must satisfy its rule:
+        //   - Name: 1..100 characters
+        //   - Region: max 50 characters
+        //   - Age: 1..99
+        //   - Wins / Losses: non-negative
+        // As with CreateTrainer, [ApiController] normally rejects invalid bodies before this point; this
+        // check is a defensive fallback that returns our ApiResponse envelope.
         if (!ModelState.IsValid)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("Invalid input data", 400));
@@ -183,6 +202,11 @@ public class TrainersController : ControllerBase
 
         try
         {
+            // Edge cases handled by the service:
+            //   - ids <= 0 throw ArgumentException, which is caught below and surfaces as 500 (not 400).
+            //   - Omitted (null) fields are left unchanged. An empty Name is ignored, while an empty
+            //     Region string is applied and clears the region.
+            //   - Positive but unknown ids return null -> 404.
             var trainer = await _trainerService.UpdateTrainerAsync(id, updateTrainerDto);
             if (trainer == null)
             {
@@ -218,6 +242,8 @@ public class TrainersController : ControllerBase
     {
         try
         {
+            // Route validation happens in the service: ids <= 0 throw ArgumentException, which is caught
+            // below and surfaces as 500 (not 400). Positive but unknown ids return false -> 404.
             var deleted = await _trainerService.DeleteTrainerAsync(id);
             if (!deleted)
             {
@@ -303,7 +329,15 @@ public class TrainersController : ControllerBase
                 SortOrder = sortOrder
             };
 
-            // Validate search criteria
+            // Validate search criteria. PaginatedTrainerSearchDto.IsValid() enforces:
+            //   - MinAge <= MaxAge, MinWins <= MaxWins, MinPokemonCount <= MaxPokemonCount
+            //     (each pair only when both bounds are supplied; a single bound is always accepted)
+            //   - sortBy (case-insensitive) is one of: name, region, age, wins, losses, pokemonCount, createdAt
+            //   - sortOrder (case-insensitive) is "asc" or "desc"
+            // Whitelisting sortBy/sortOrder prevents arbitrary values from reaching the sorting logic.
+            // Edge case: the DTO's [Range] attributes (ages 1..99, non-negative counts, pageNumber >= 1,
+            // pageSize 1..100) are NOT evaluated, because the DTO is built manually from query parameters.
+            // pageSize > 100 is not capped, and pageNumber/pageSize values <= 0 are passed to the service.
             if (!searchCriteria.IsValid())
             {
                 return BadRequest(ApiResponse<object>.ErrorResponse(

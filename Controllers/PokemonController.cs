@@ -58,6 +58,10 @@ public class PokemonController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), 404)]
     public async Task<ActionResult<ApiResponse<PokemonResponseDto>>> AddPokemonToTrainer(int trainerId, [FromBody] AddExistingPokemonDto addExistingPokemonDto)
     {
+        // Body validation: AddExistingPokemonDto requires PokemonId in the range 1..int.MaxValue.
+        // Because of [ApiController] (SuppressModelStateInvalidFilter = false in Program.cs), an invalid
+        // body is normally rejected with a 400 ProblemDetails before this action runs. This check is a
+        // defensive fallback that returns our ApiResponse envelope when the action is invoked directly.
         if (!ModelState.IsValid)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("Invalid input data", 400));
@@ -65,13 +69,17 @@ public class PokemonController : ControllerBase
 
         try
         {
-            // Check if trainer exists
+            // Route validation: trainerId is only checked for existence, not sign. Zero, negative and
+            // unknown IDs all fall through to the same 404 response.
             var trainerExists = await _trainerService.TrainerExistsAsync(trainerId);
             if (!trainerExists)
             {
                 return NotFound(ApiResponse<object>.ErrorResponse("Trainer not found", 404));
             }
 
+            // The service returns null when the Pokemon does not exist OR is already owned by a trainer.
+            // Both cases are treated as a client error (400) rather than 404, since the trainer was found
+            // and the request itself is what cannot be fulfilled.
             var pokemon = await _pokemonService.AddExistingPokemonToTrainerAsync(trainerId, addExistingPokemonDto.PokemonId);
             if (pokemon == null)
             {
@@ -82,6 +90,8 @@ public class PokemonController : ControllerBase
         }
         catch (Exception)
         {
+            // Any unexpected failure (e.g. database errors) is hidden behind a generic 500 so internal
+            // details are not leaked to the client.
             return StatusCode(500, ApiResponse<object>.ErrorResponse("Internal server error", 500));
         }
     }
@@ -129,7 +139,8 @@ public class PokemonController : ControllerBase
     {
         try
         {
-            // Check if any search criteria are provided
+            // Check if any search criteria are provided. Whitespace-only strings count as "not provided",
+            // so "?name=%20" behaves like no filter and returns all Pokemon.
             var hasSearchCriteria = !string.IsNullOrWhiteSpace(name) ||
                                    !string.IsNullOrWhiteSpace(type) ||
                                    minLevel.HasValue ||
@@ -150,7 +161,11 @@ public class PokemonController : ControllerBase
                     HasOwner = hasOwner
                 };
 
-                // Validate search criteria
+                // Validate search criteria. PokemonSearchDto.IsValid() only enforces MinLevel <= MaxLevel,
+                // and only when both are supplied; a single bound is always accepted.
+                // Note: the DTO's [Range(1, 100)] attributes are NOT evaluated here, because the DTO is built
+                // manually from query parameters rather than model-bound. Out-of-range levels (e.g. 0 or 500)
+                // are therefore accepted and simply yield fewer or no results.
                 if (!searchCriteria.IsValid())
                 {
                     return BadRequest(ApiResponse<object>.ErrorResponse("Invalid search criteria: MinLevel must be less than or equal to MaxLevel", 400));
@@ -172,6 +187,7 @@ public class PokemonController : ControllerBase
         }
         catch (Exception)
         {
+            // Unexpected failures are reported as a generic 500 without exposing internal details.
             return StatusCode(500, ApiResponse<object>.ErrorResponse("Internal server error", 500));
         }
     }
@@ -239,11 +255,21 @@ public class PokemonController : ControllerBase
                 SortOrder = sortOrder
             };
 
-            // Validate search criteria
+            // Validate search criteria. PaginatedPokemonSearchDto.IsValid() enforces:
+            //   - MinLevel <= MaxLevel when both are supplied
+            //   - sortBy (case-insensitive) is one of the whitelisted fields, or empty
+            //   - sortOrder (case-insensitive) is "asc" or "desc", or empty
+            // Whitelisting sortBy/sortOrder prevents arbitrary values from reaching the sorting logic.
+            // Edge cases:
+            //   - sortBy is lower-cased before comparison against { "name", "level", "caughtAt", "type" },
+            //     so "caughtAt" can never match and sorting by caught date is currently rejected with 400.
+            //   - The DTO's [Range] attributes (levels 1..100, pageNumber >= 1, pageSize 1..100) are NOT
+            //     evaluated, because the DTO is built manually from query parameters. pageSize > 100 is not
+            //     capped, and pageNumber/pageSize values <= 0 are passed straight to the service.
             if (!searchCriteria.IsValid())
             {
                 return BadRequest(ApiResponse<object>.ErrorResponse(
-                    "Invalid search criteria. Check level ranges, sort fields (name, level, caughtAt, type), and sort order (asc, desc).", 
+                    "Invalid search criteria. Check level ranges, sort fields (name, level, caughtAt, type), and sort order (asc, desc).",
                     400));
             }
 
@@ -257,6 +283,8 @@ public class PokemonController : ControllerBase
         }
         catch (Exception)
         {
+            // Unexpected failures (including ones caused by invalid paging values that slipped past
+            // IsValid()) are reported as a generic 500 without exposing internal details.
             return StatusCode(500, ApiResponse<object>.ErrorResponse("Internal server error", 500));
         }
     }
