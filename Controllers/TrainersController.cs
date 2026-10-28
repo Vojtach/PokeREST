@@ -166,8 +166,8 @@ public class TrainersController : ControllerBase
     /// <remarks>
     /// <c>PATCH /api/trainers/{id}</c>
     ///
-    /// Only fields present in the request body are changed; omitted or <c>null</c> fields keep their current values.
-    /// An empty <c>name</c> is ignored, whereas an empty <c>region</c> clears the region.
+    /// Omitted or <c>null</c> fields keep their current values. An empty <c>name</c> fails validation (400).
+    /// An empty <c>region</c> is accepted and stores an empty string. The service ignores an empty name only when that validation is bypassed.
     ///
     /// Sample request:
     ///
@@ -214,8 +214,8 @@ public class TrainersController : ControllerBase
         {
             // Edge cases handled by the service:
             //   - ids <= 0 throw ArgumentException, which is caught below and surfaces as 500 (not 400).
-            //   - Omitted (null) fields are left unchanged. An empty Name is ignored, while an empty
-            //     Region string is applied and clears the region.
+            //   - Omitted (null) fields are left unchanged. An empty Name is ignored only when API
+            //     validation is bypassed. An empty Region string is stored as an empty string.
             //   - Positive but unknown ids return null -> 404.
             var trainer = await _trainerService.UpdateTrainerAsync(id, updateTrainerDto);
             if (trainer == null)
@@ -237,7 +237,7 @@ public class TrainersController : ControllerBase
     /// <remarks>
     /// <c>DELETE /api/trainers/{id}</c>
     ///
-    /// The trainer's Pokemon are not deleted; they are released and become unowned (wild) Pokemon,
+    /// The trainer's Pokemon are not deleted. Their owner is cleared and <c>caughtAt</c> is left unchanged,
     /// so another trainer can catch them later.
     /// </remarks>
     /// <param name="id">ID of the trainer to delete (route parameter, positive integer).</param>
@@ -274,9 +274,10 @@ public class TrainersController : ControllerBase
     /// <remarks>
     /// <c>GET /api/trainers/paginated</c>
     ///
-    /// Text filters use case-insensitive substring matching. All range filters are inclusive, and each minimum
-    /// must not exceed its maximum. The documented limits for ages (1–99) and counts (non-negative) are not enforced.
-    /// Filters are applied first, then sorting, then pagination.
+    /// Filters are AND-combined. Text filters are case-insensitive substrings; whitespace-only values are ignored.
+    /// Range filters are inclusive, and each minimum must not exceed its maximum. Age bounds exclude trainers with no age,
+    /// and win bounds exclude trainers whose Wins is null. Trainers with zero wins are included when the range allows. Annotated limits (ages 1–99, non-negative counts) are not enforced.
+    /// Filters run first, then sorting, then pagination.
     /// Sort field and sort order values are case-insensitive.
     ///
     /// Sample request:
@@ -287,12 +288,12 @@ public class TrainersController : ControllerBase
     /// <param name="region">Optional substring that the trainer region must contain. Trainers without a region are excluded when set.</param>
     /// <param name="minAge">Optional inclusive minimum age. Trainers without an age are excluded when set.</param>
     /// <param name="maxAge">Optional inclusive maximum age. Trainers without an age are excluded when set.</param>
-    /// <param name="minWins">Optional inclusive minimum number of wins.</param>
-    /// <param name="maxWins">Optional inclusive maximum number of wins.</param>
+    /// <param name="minWins">Optional inclusive minimum wins. Trainers whose Wins is null are excluded when set; zero wins are included when the range allows.</param>
+    /// <param name="maxWins">Optional inclusive maximum wins. Trainers whose Wins is null are excluded when set; zero wins are included when the range allows.</param>
     /// <param name="minPokemonCount">Optional inclusive minimum number of owned Pokemon.</param>
     /// <param name="maxPokemonCount">Optional inclusive maximum number of owned Pokemon.</param>
     /// <param name="pageNumber">1-based page number to return (default: 1). Values below 1 are not rejected up front and result in a 500.</param>
-    /// <param name="pageSize">Number of items per page (default: 10). The intended range is 1–100, but it is not enforced.</param>
+    /// <param name="pageSize">Number of items per page (default: 10). The intended range is 1–100 and is not enforced. A negative value results in a 500. Zero returns an empty page with invalid pagination metadata.</param>
     /// <param name="sortBy">
     /// Sort field: <c>name</c>, <c>region</c>, <c>age</c>, <c>wins</c>, <c>losses</c>, <c>pokemonCount</c>, or <c>createdAt</c> (default: <c>name</c>).
     /// </param>
