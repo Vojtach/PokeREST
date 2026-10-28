@@ -56,7 +56,7 @@ public class PokemonController : ControllerBase
     /// automatic validation is bypassed (e.g. the action is invoked directly).
     /// </response>
     /// <response code="404">Trainer with the given ID does not exist.</response>
-    /// <response code="500">Unexpected server error. Also returned for a non-positive ID, because the service rejects it with an exception instead of a 400.</response>
+    /// <response code="500">Unexpected server error. A non-positive <c>trainerId</c> also returns 500, because the service throws instead of rejecting it as 400.</response>
     [HttpPost("trainers/{trainerId}/pokemon")]
     [ProducesResponseType(typeof(ApiResponse<PokemonResponseDto>), 200)]
     [ProducesResponseType(typeof(ApiResponse<object>), 400)]
@@ -108,12 +108,12 @@ public class PokemonController : ControllerBase
     /// <remarks>
     /// <c>GET /api/pokemon</c>
     ///
-    /// With no query parameters, every Pokemon is returned. When at least one parameter is supplied, a search is performed:
-    /// level and ownership filters are applied exactly, while <paramref name="name"/>, <paramref name="type"/>, and
-    /// <paramref name="owner"/> are fuzzy-matched (partial matches and minor typos are tolerated). When several text
-    /// filters are supplied, a Pokemon is included if <em>any</em> of them matches (OR, not AND). Results are ordered
-    /// by match relevance, then by name. Known quirk: supplying <paramref name="type"/> and <paramref name="owner"/>
-    /// without <paramref name="name"/> filters nothing out; every Pokemon is returned, ranked by relevance.
+    /// With no query parameters, every Pokemon is returned. Whitespace-only text parameters count as omitted.
+    /// Level and <paramref name="hasOwner"/> filter first (exact, AND). <paramref name="name"/>, <paramref name="type"/>,
+    /// and <paramref name="owner"/> are then fuzzy-matched (partial matches and minor typos) and OR-combined: a Pokemon
+    /// is kept if any text filter matches. Results are ordered by relevance, then by name.
+    /// Quirk: <paramref name="type"/> plus <paramref name="owner"/> without <paramref name="name"/> excludes nobody.
+    /// Level and ownership filters still apply; the remaining rows are ranked by relevance.
     ///
     /// Sample requests:
     ///
@@ -126,7 +126,7 @@ public class PokemonController : ControllerBase
     /// <param name="type">Optional Pokemon type name to fuzzy-match (e.g. <c>fire</c>, <c>water</c>).</param>
     /// <param name="minLevel">Optional inclusive minimum level. Must not exceed <paramref name="maxLevel"/>. Values outside 1–100 are not rejected.</param>
     /// <param name="maxLevel">Optional inclusive maximum level. Values outside 1–100 are not rejected.</param>
-    /// <param name="owner">Optional owner (trainer) name to fuzzy-match. Only Pokemon that have an owner can match.</param>
+    /// <param name="owner">Optional owner name to fuzzy-match. Unowned Pokemon never satisfy this criterion, but another matching text filter can still include them.</param>
     /// <param name="hasOwner">Optional ownership filter: <c>true</c> for owned Pokemon only, <c>false</c> for wild (unowned) Pokemon only.</param>
     /// <returns>
     /// An <see cref="ApiResponse{T}"/> wrapping a list of <see cref="PokemonResponseDto"/>. The list is empty when nothing matches.
@@ -206,8 +206,9 @@ public class PokemonController : ControllerBase
     /// <remarks>
     /// <c>GET /api/pokemon/paginated</c>
     ///
-    /// Unlike <c>GET /api/pokemon</c>, text filters here use case-insensitive substring matching (no typo tolerance),
-    /// and the query runs on the database. Filters are applied first, then sorting, then pagination.
+    /// Unlike <c>GET /api/pokemon</c>, filters are AND-combined. Text filters are case-insensitive substrings
+    /// (no typo tolerance) and run in the database. Whitespace-only text values are ignored.
+    /// Filters run first, then sorting, then pagination.
     /// Sort field and sort order values are case-insensitive.
     ///
     /// Sample request:
@@ -218,10 +219,10 @@ public class PokemonController : ControllerBase
     /// <param name="type">Optional substring that the Pokemon type name must contain.</param>
     /// <param name="minLevel">Optional inclusive minimum level. Must not exceed <paramref name="maxLevel"/>. Values outside 1–100 are not rejected.</param>
     /// <param name="maxLevel">Optional inclusive maximum level. Values outside 1–100 are not rejected.</param>
-    /// <param name="owner">Optional substring that the owner (trainer) name must contain.</param>
+    /// <param name="owner">Optional substring the owner name must contain. Unowned Pokemon are excluded.</param>
     /// <param name="hasOwner">Optional ownership filter: <c>true</c> for owned Pokemon only, <c>false</c> for wild (unowned) Pokemon only.</param>
     /// <param name="pageNumber">1-based page number to return (default: 1). Values below 1 are not rejected up front and result in a 500.</param>
-    /// <param name="pageSize">Number of items per page (default: 10). The intended range is 1–100, but it is not enforced.</param>
+    /// <param name="pageSize">Number of items per page (default: 10). The intended range is 1–100 and is not enforced. A negative value results in a 500. Zero returns an empty page with invalid pagination metadata.</param>
     /// <param name="sortBy">
     /// Sort field: <c>name</c>, <c>level</c>, or <c>type</c> (default: <c>name</c>). <c>caughtAt</c> is advertised but
     /// is currently rejected with 400 because of a case mismatch in the whitelist check.
