@@ -64,9 +64,9 @@ public class TrainersController : ControllerBase
         //   - Region: optional, max 50 characters
         //   - Age: optional, 1..99
         // Because of [ApiController] (SuppressModelStateInvalidFilter = false in Program.cs), an invalid
-        // body is normally rejected with a 400 ProblemDetails before this action runs. This check is a
+        // or null body is normally rejected with a 400 ProblemDetails before this action runs. This check is a
         // defensive fallback that returns our ApiResponse envelope when the action is invoked directly.
-        if (!ModelState.IsValid)
+        if (createTrainerDto == null || !ModelState.IsValid)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("Invalid input data", 400));
         }
@@ -203,9 +203,9 @@ public class TrainersController : ControllerBase
         //   - Region: max 50 characters
         //   - Age: 1..99
         //   - Wins / Losses: non-negative
-        // As with CreateTrainer, [ApiController] normally rejects invalid bodies before this point; this
+        // As with CreateTrainer, [ApiController] normally rejects invalid or null bodies before this point; this
         // check is a defensive fallback that returns our ApiResponse envelope.
-        if (!ModelState.IsValid)
+        if (updateTrainerDto == null || !ModelState.IsValid)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("Invalid input data", 400));
         }

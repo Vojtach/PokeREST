@@ -467,13 +467,13 @@ public class TrainerService : ITrainerService
         return new TrainerResponseDto
         {
             Id = trainer.Id,
-            Name = trainer.Name,
+            Name = trainer.Name ?? string.Empty,
             Region = trainer.Region,
             Age = trainer.Age,
             CreatedAt = trainer.CreatedAt,
             Wins = trainer.Wins,
             Losses = trainer.Losses,
-            PokemonCount = trainer.Pokemons.Count
+            PokemonCount = trainer.Pokemons?.Count ?? 0
         };
     }
     
@@ -485,14 +485,14 @@ public class TrainerService : ITrainerService
         return new TrainerWithPokemonDto
         {
             Id = trainer.Id,
-            Name = trainer.Name,
+            Name = trainer.Name ?? string.Empty,
             Region = trainer.Region,
             Age = trainer.Age,
             CreatedAt = trainer.CreatedAt,
             Wins = trainer.Wins,
             Losses = trainer.Losses,
-            PokemonCount = trainer.Pokemons.Count,
-            Pokemons = trainer.Pokemons.Select(MapToPokemonResponseDto).ToList()
+            PokemonCount = trainer.Pokemons?.Count ?? 0,
+            Pokemons = (trainer.Pokemons ?? Enumerable.Empty<Pokemon>()).Select(MapToPokemonResponseDto).ToList()
         };
     }
     
@@ -501,19 +501,23 @@ public class TrainerService : ITrainerService
     /// </summary>
     /// <remarks>
     /// Duplicates the mapping in PokemonService; keep the two in sync.
+    /// Missing type, move, or move-type navigations become empty strings. A join row whose move is null is omitted.
     /// </remarks>
     private static PokemonResponseDto MapToPokemonResponseDto(Pokemon pokemon)
     {
         return new PokemonResponseDto
         {
             Id = pokemon.Id,
-            Name = pokemon.Name,
+            Name = pokemon.Name ?? string.Empty,
             Level = pokemon.Level,
-            Type = pokemon.Type.Name,
+            Type = pokemon.Type?.Name ?? string.Empty,
             Owner = pokemon.Owner?.Name,
             Health = pokemon.Health,
             CaughtAt = pokemon.CaughtAt,
-            Moves = pokemon.PokemonMoves.Select(MapToMoveResponseDto).ToList()
+            Moves = (pokemon.PokemonMoves ?? Enumerable.Empty<PokemonMove>())
+                .Where(pm => pm?.Move != null)
+                .Select(MapToMoveResponseDto)
+                .ToList()
         };
     }
     
@@ -525,9 +529,9 @@ public class TrainerService : ITrainerService
         return new MoveResponseDto
         {
             Id = pokemonMove.Move.Id,
-            Name = pokemonMove.Move.Name,
+            Name = pokemonMove.Move.Name ?? string.Empty,
             Power = pokemonMove.Move.Power,
-            Type = pokemonMove.Move.Type.Name
+            Type = pokemonMove.Move.Type?.Name ?? string.Empty
         };
     }
     

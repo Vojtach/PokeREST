@@ -387,4 +387,120 @@ public class PokemonServiceTests : IClassFixture<DatabaseFixture>
         var levels = result.Data.Select(p => p.Level).ToList();
         levels.Should().BeInAscendingOrder();
     }
+
+    [Fact]
+    public async Task GetPaginatedPokemonAsync_SortByType_OrdersByTypeName()
+    {
+        var result = await _service.GetPaginatedPokemonAsync(new PaginatedPokemonSearchDto
+        {
+            SortBy = "type",
+            SortOrder = "asc",
+            PageNumber = 1,
+            PageSize = 20
+        });
+
+        result.Data.Select(p => p.Type).Should().BeInAscendingOrder();
+        result.Data.Should().Contain(p => p.Type == "Electric");
+        result.Data.Should().Contain(p => p.Type == "Fire");
+    }
+
+    [Fact]
+    public void MapToPokemonResponseDto_WhenTypeOrMoveIsNull_OmitsNullMoveAndUsesEmptyNames()
+    {
+        var pokemon = new Pokemon
+        {
+            Id = 100,
+            Name = null!,
+            Level = 4,
+            Health = 20,
+            Type = null!,
+            PokemonMoves = new List<PokemonMove>
+            {
+                new() { Move = null! },
+                new()
+                {
+                    Move = new Move
+                    {
+                        Id = 80,
+                        Name = null!,
+                        Power = 15,
+                        Type = null!
+                    }
+                }
+            }
+        };
+
+        var dto = InvokePrivate<PokemonResponseDto>(
+            typeof(PokemonService),
+            "MapToPokemonResponseDto",
+            pokemon);
+
+        dto.Name.Should().BeEmpty();
+        dto.Type.Should().BeEmpty();
+        dto.Owner.Should().BeNull();
+        dto.Moves.Should().ContainSingle();
+        dto.Moves[0].Id.Should().Be(80);
+        dto.Moves[0].Name.Should().BeEmpty();
+        dto.Moves[0].Power.Should().Be(15);
+        dto.Moves[0].Type.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ProcessTypeMatching_WhenTypeNavigationIsNull_DoesNotMatchAndDoesNotThrow()
+    {
+        var service = new PokemonService(_fixture.Context);
+        var onlyType = InvokePrivate<(double score, bool matched, bool shouldSkip)>(
+            service,
+            "ProcessTypeMatching",
+            new Pokemon { Name = "Typeless", Type = null! },
+            new PokemonSearchDto { Type = "Electric" });
+        var withOtherCriterion = InvokePrivate<(double score, bool matched, bool shouldSkip)>(
+            service,
+            "ProcessTypeMatching",
+            new Pokemon { Name = "Typeless", Type = null! },
+            new PokemonSearchDto { Type = "Electric", Name = "Typeless" });
+
+        onlyType.matched.Should().BeFalse();
+        onlyType.shouldSkip.Should().BeTrue();
+        withOtherCriterion.matched.Should().BeFalse();
+        withOtherCriterion.shouldSkip.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ApplySortingAndTypeFilter_WhenTypeIsNull_SkipsNullTypeWithoutThrowing()
+    {
+        var electric = new Pokemon { Id = 1, Name = "Pikachu", Type = new Element { Name = "Electric" } };
+        var typeless = new Pokemon { Id = 2, Name = "Typeless", Type = null! };
+        var source = new[] { typeless, electric }.AsQueryable();
+
+        var filtered = InvokePrivate<IQueryable<Pokemon>>(
+            typeof(PokemonService),
+            "ApplyPaginatedSearchFilters",
+            source,
+            new PaginatedPokemonSearchDto { Type = "Electric" });
+        var sorted = InvokePrivate<IQueryable<Pokemon>>(
+            typeof(PokemonService),
+            "ApplySorting",
+            source,
+            "type",
+            "asc");
+
+        filtered.Select(p => p.Id).Should().Equal(1);
+        sorted.Select(p => p.Id).Should().Equal(2, 1);
+    }
+
+    private static T InvokePrivate<T>(Type type, string methodName, params object?[] args) =>
+        InvokePrivate<T>(null, type, methodName, args);
+
+    private static T InvokePrivate<T>(object? instance, string methodName, params object?[] args) =>
+        InvokePrivate<T>(instance, instance!.GetType(), methodName, args);
+
+    private static T InvokePrivate<T>(object? instance, Type type, string methodName, params object?[] args)
+    {
+        var method = type.GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        var result = method!.Invoke(instance, args);
+        return (T)result!;
+    }
 }
