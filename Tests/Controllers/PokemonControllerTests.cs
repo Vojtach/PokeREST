@@ -479,4 +479,21 @@ public class PokemonControllerTests
         response.StatusCode.Should().Be(500);
         response.Message.Should().Be("Internal server error");
     }
+
+    [Fact]
+    public async Task AddPokemonToTrainer_WithNullBody_ShouldReturnBadRequest()
+    {
+        var result = await _controller.AddPokemonToTrainer(1, null!);
+
+        var badRequestResult = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        badRequestResult.StatusCode.Should().Be(400);
+        var response = badRequestResult.Value.Should().BeOfType<ApiResponse<object>>().Subject;
+        response.Success.Should().BeFalse();
+        response.StatusCode.Should().Be(400);
+        response.Message.Should().Be("Invalid input data");
+        _mockTrainerService.Verify(s => s.TrainerExistsAsync(It.IsAny<int>()), Times.Never);
+        _mockPokemonService.Verify(
+            s => s.AddExistingPokemonToTrainerAsync(It.IsAny<int>(), It.IsAny<int>()),
+            Times.Never);
+    }
 }

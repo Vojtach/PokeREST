@@ -446,4 +446,33 @@ public class TrainersControllerTests
         response.StatusCode.Should().Be(400);
         response.Message.Should().Contain("Invalid search criteria");
     }
+
+    [Fact]
+    public async Task CreateTrainer_WithNullBody_ShouldReturnBadRequest()
+    {
+        var result = await _controller.CreateTrainer(null!);
+
+        var badRequestResult = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        badRequestResult.StatusCode.Should().Be(400);
+        var response = badRequestResult.Value.Should().BeOfType<ApiResponse<object>>().Subject;
+        response.Success.Should().BeFalse();
+        response.StatusCode.Should().Be(400);
+        response.Message.Should().Be("Invalid input data");
+        _mockTrainerService.Verify(s => s.CreateTrainerAsync(It.IsAny<CreateTrainerDto>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateTrainer_WithNullBody_ShouldReturnBadRequest()
+    {
+        var result = await _controller.UpdateTrainer(1, null!);
+
+        var badRequestResult = result.Result.Should().BeOfType<BadRequestObjectResult>().Subject;
+        badRequestResult.StatusCode.Should().Be(400);
+        var response = badRequestResult.Value.Should().BeOfType<ApiResponse<object>>().Subject;
+        response.Success.Should().BeFalse();
+        response.Message.Should().Be("Invalid input data");
+        _mockTrainerService.Verify(
+            s => s.UpdateTrainerAsync(It.IsAny<int>(), It.IsAny<UpdateTrainerDto>()),
+            Times.Never);
+    }
 }

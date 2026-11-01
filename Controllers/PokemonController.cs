@@ -65,9 +65,9 @@ public class PokemonController : ControllerBase
     {
         // Body validation: AddExistingPokemonDto requires PokemonId in the range 1..int.MaxValue.
         // Because of [ApiController] (SuppressModelStateInvalidFilter = false in Program.cs), an invalid
-        // body is normally rejected with a 400 ProblemDetails before this action runs. This check is a
+        // or null body is normally rejected with a 400 ProblemDetails before this action runs. This check is a
         // defensive fallback that returns our ApiResponse envelope when the action is invoked directly.
-        if (!ModelState.IsValid)
+        if (addExistingPokemonDto == null || !ModelState.IsValid)
         {
             return BadRequest(ApiResponse<object>.ErrorResponse("Invalid input data", 400));
         }

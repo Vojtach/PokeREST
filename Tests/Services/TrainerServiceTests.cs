@@ -301,4 +301,62 @@ public class TrainerServiceTests : IClassFixture<DatabaseFixture>
         var ages = result.Data.Select(t => t.Age ?? 0).ToList();
         ages.Should().BeInDescendingOrder();
     }
+
+    [Fact]
+    public void MapToTrainerWithPokemonDto_WhenPokemonTypeOrMoveIsNull_MapsWithoutThrowing()
+    {
+        var trainer = new Trainer
+        {
+            Id = 5,
+            Name = null!,
+            Pokemons = null!
+        };
+        var summary = InvokePrivate<TrainerResponseDto>(typeof(TrainerService), "MapToTrainerResponseDto", trainer);
+        summary.Name.Should().BeEmpty();
+        summary.PokemonCount.Should().Be(0);
+
+        trainer.Pokemons = new List<Pokemon>
+        {
+            new()
+            {
+                Id = 100,
+                Name = "Typeless",
+                Level = 4,
+                Health = 20,
+                Type = null!,
+                PokemonMoves = new List<PokemonMove>
+                {
+                    new() { Move = null! },
+                    new()
+                    {
+                        Move = new Move
+                        {
+                            Id = 80,
+                            Name = "Mystery",
+                            Power = 15,
+                            Type = null!
+                        }
+                    }
+                }
+            }
+        };
+
+        var detailed = InvokePrivate<TrainerWithPokemonDto>(typeof(TrainerService), "MapToTrainerWithPokemonDto", trainer);
+
+        detailed.PokemonCount.Should().Be(1);
+        var pokemon = detailed.Pokemons.Should().ContainSingle().Subject;
+        pokemon.Type.Should().BeEmpty();
+        pokemon.Moves.Should().ContainSingle();
+        pokemon.Moves[0].Name.Should().Be("Mystery");
+        pokemon.Moves[0].Type.Should().BeEmpty();
+    }
+
+    private static T InvokePrivate<T>(Type type, string methodName, params object?[] args)
+    {
+        var method = type.GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+        var result = method!.Invoke(null, args);
+        return (T)result!;
+    }
 }

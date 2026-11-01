@@ -272,9 +272,12 @@ public class PokemonService : IPokemonService
             return (0, false, false);
         }
 
-        if (FuzzyMatchingHelper.IsFuzzyMatch(searchCriteria.Type, pokemon.Type.Name))
+        // A Pokemon whose type row is missing is not a match; do not dereference Type.
+        var typeName = pokemon.Type?.Name;
+        if (!string.IsNullOrWhiteSpace(typeName) &&
+            FuzzyMatchingHelper.IsFuzzyMatch(searchCriteria.Type, typeName))
         {
-            var score = FuzzyMatchingHelper.GetMatchScore(searchCriteria.Type, pokemon.Type.Name) * TypeMatchWeighting;
+            var score = FuzzyMatchingHelper.GetMatchScore(searchCriteria.Type, typeName) * TypeMatchWeighting;
             return (score, true, false);
         }
 
@@ -342,7 +345,7 @@ public class PokemonService : IPokemonService
         if (!string.IsNullOrWhiteSpace(searchCriteria.Type))
         {
             var searchType = searchCriteria.Type.ToLower();
-            query = query.Where(p => p.Type.Name.ToLower().Contains(searchType));
+            query = query.Where(p => p.Type != null && p.Type.Name != null && p.Type.Name.ToLower().Contains(searchType));
         }
 
         if (searchCriteria.MinLevel.HasValue)
@@ -392,9 +395,9 @@ public class PokemonService : IPokemonService
                 // Never-caught Pokemon (null CaughtAt) sort first in ascending order.
                 ? query.OrderByDescending(p => p.CaughtAt ?? DateTime.MinValue) 
                 : query.OrderBy(p => p.CaughtAt ?? DateTime.MinValue),
-            "type" => isDescending 
-                ? query.OrderByDescending(p => p.Type.Name) 
-                : query.OrderBy(p => p.Type.Name),
+            "type" => isDescending
+                ? query.OrderByDescending(p => p.Type != null ? p.Type.Name ?? string.Empty : string.Empty)
+                : query.OrderBy(p => p.Type != null ? p.Type.Name ?? string.Empty : string.Empty),
             _ => query.OrderBy(p => p.Name)
         };
     }
@@ -436,8 +439,8 @@ public class PokemonService : IPokemonService
     /// Maps a Pokemon entity to a PokemonResponseDto.
     /// </summary>
     /// <remarks>
-    /// Requires Type and PokemonMoves.Move.Type to be loaded (see <see cref="BuildBasePokemonQuery"/>); otherwise it
-    /// throws a NullReferenceException. TrainerService has its own copy of this mapping; keep the two in sync.
+    /// Missing type, move, or move-type navigations become empty strings. A join row whose move is null is omitted.
+    /// TrainerService has its own copy of this mapping; keep the two in sync.
     /// </remarks>
     private static PokemonResponseDto MapToPokemonResponseDto(Pokemon pokemon)
     {
@@ -446,19 +449,21 @@ public class PokemonService : IPokemonService
         return new PokemonResponseDto
         {
             Id = pokemon.Id,
-            Name = pokemon.Name,
+            Name = pokemon.Name ?? string.Empty,
             Level = pokemon.Level,
-            Type = pokemon.Type.Name,
+            Type = pokemon.Type?.Name ?? string.Empty,
             Owner = pokemon.Owner?.Name,
             Health = pokemon.Health,
             CaughtAt = pokemon.CaughtAt,
-            Moves = pokemon.PokemonMoves.Select(pm => new MoveResponseDto
-            {
-                Id = pm.Move.Id,
-                Name = pm.Move.Name,
-                Power = pm.Move.Power,
-                Type = pm.Move.Type.Name
-            }).ToList()
+            Moves = (pokemon.PokemonMoves ?? Enumerable.Empty<PokemonMove>())
+                .Where(pm => pm?.Move != null)
+                .Select(pm => new MoveResponseDto
+                {
+                    Id = pm.Move.Id,
+                    Name = pm.Move.Name ?? string.Empty,
+                    Power = pm.Move.Power,
+                    Type = pm.Move.Type?.Name ?? string.Empty
+                }).ToList()
         };
     }
 }
